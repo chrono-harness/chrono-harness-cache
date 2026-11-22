@@ -1,0 +1,29 @@
+[package]
+name = "chrono-cache"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Explicit cache input and artifact planning"
+
+[lib]
+test = false
+doctest = false
+
+[[bin]]
+name = "chrono-cache"
+path = "src/main.rs"
+test = false
+bench = false
+
+[dependencies]
+chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "5c9364711a47ab45242195f11ca350e5d2b858cf" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+
+# Cargo uses the build root's profile for the shared runner dependency too.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package.sha2]
+opt-level = 3

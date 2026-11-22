@@ -1,0 +1,45 @@
+[package]
+name = "chrono-cache-tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+chrono-test-process = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "5c9364711a47ab45242195f11ca350e5d2b858cf" }
+chrono-cache = { path = "../cache" }
+chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "5c9364711a47ab45242195f11ca350e5d2b858cf" }
+
+[dev-dependencies]
+libc = "0.2"
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
+verus_builtin_macros = "=0.0.0-2026-04-20-1748"
+
+[[bin]]
+name = "chrono-cache-test-cli"
+path = "../cache/src/main.rs"
+test = false
+bench = false
+
+[[test]]
+name = "keys"
+path = "tests/keys.rs"
+
+[[test]]
+name = "verified_planner"
+path = "tests/verified_planner.rs"
+
+[[bin]]
+name = "chrono-cache-test-probe"
+path = "tests/support/probe.rs"
+test = false
+bench = false
+
+# Keep the actual cache CLI and its test CLI on the same development profile.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package.sha2]
+opt-level = 3
