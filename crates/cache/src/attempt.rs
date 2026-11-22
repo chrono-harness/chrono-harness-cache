@@ -1,9 +1,8 @@
 //! Cache planning owns its original probe attempts; retention owns custody and disposal.
 #![allow(unexpected_cfgs)]
-#[cfg(verus_keep_ghost)]
-use super::identifiers;
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{verified_identifiers as identifiers, verus};
+use chrono_harness::verus;
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -341,7 +340,7 @@ pub fn cache_publication_error_fragments<'a>(relative: &'a str,
 pub fn same_attempt(expected: &str, original: Option<&str>) -> (bound: bool)
     ensures bound == match original { Some(value) => expected@ == value@, None => false },
 {
-    match original { Some(value) => identifiers::equal_text(expected, value), None => false }
+    match original { Some(value) => <&str>::exec_eq(expected, value), None => false }
 }
 
 pub fn accept_original(bound: bool, terminal: bool, sealed: bool) -> (accepted: bool)
