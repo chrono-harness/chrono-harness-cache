@@ -1,5 +1,5 @@
 //! Restore-time timestamps for declared inputs; Cargo still owns compilation and incremental reuse.
-use chrono_harness::file_identity;
+use crate::file_identity;
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,

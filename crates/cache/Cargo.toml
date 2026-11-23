@@ -17,12 +17,14 @@ bench = false
 
 [dependencies]
 vstd = "=0.0.0-2026-04-20-1748"
-chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "5c9364711a47ab45242195f11ca350e5d2b858cf" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
+serde_jcs = "=0.2.0"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 
-# Cargo uses the build root's profile for the shared runner dependency too.
+tracing-tunnel = { version = "=0.1.0", default-features = false, features = ["sender"] }
+
 [profile.dev]
 opt-level = 1
 

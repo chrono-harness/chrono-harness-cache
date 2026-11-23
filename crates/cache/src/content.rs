@@ -1,6 +1,6 @@
 //! Producer-bound inventories for explicitly opted-in primary-checkout caches.
 //! Inventories describe output bytes; they contain no cached execution verdicts.
-use chrono_harness::{decode, file_identity, no_symlink_parents};
+use crate::{decode, file_identity, no_symlink_parents};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fs, path::Path, time::Instant};
 
@@ -183,7 +183,7 @@ pub(crate) fn dispatch(args: &[String]) -> Result<String, String> {
             .ok_or_else(|| format!("E_CACHE_CONTENT: missing {key}"))
     };
     let root = fs::canonicalize(required("--host-root")?).map_err(|e| e.to_string())?;
-    let _activity = chrono_harness::retained_artifacts::retention::read_scope(&root)?;
+    let _activity = crate::retention::Session::scope(&root)?;
     let plan_path = required("--plan")?;
     if !plan_path.starts_with(".chrono-harness/state/") {
         return Err("E_CACHE_CONTENT: expected retained state plan".into());
@@ -235,7 +235,7 @@ pub(crate) fn dispatch(args: &[String]) -> Result<String, String> {
     {
         return Err("E_CACHE_CONTENT: unknown cache".into());
     }
-    let mut report = json!({"schema":"chrono-cache-seal/v1","plan":{"path":plan_path,"sha256":chrono_harness::sha256(&plan_raw)},
+    let mut report = json!({"schema":"chrono-cache-seal/v1","plan":{"path":plan_path,"sha256":crate::sha256(&plan_raw)},
         "native_steps":super::retain_original(&root,&directory,"producer-steps",steps_raw.as_bytes())?,"caches":{}});
     let mut outputs = String::new();
     for (index, (id, cache)) in caches.iter().enumerate() {
@@ -313,7 +313,7 @@ pub(crate) fn dispatch(args: &[String]) -> Result<String, String> {
                             let manifest = json!({"schema":METHOD,"cache":id,"producer":cache["producer"],"key":cache["key"],"artifact_id":artifact_id,"artifact":artifact,"files":files});
                             let raw = serde_json::to_vec(&manifest).map_err(|e| e.to_string())?;
                             // Publication validates marker and parent links; a failed seal never authorizes save.
-                            let marker = chrono_harness::prepare_publication(
+                            let marker = crate::files::prepare_publication(
                                 &root,
                                 &format!("{}/{MARKER}", relative.trim_end_matches('/')),
                             )?;
@@ -342,7 +342,7 @@ pub(crate) fn dispatch(args: &[String]) -> Result<String, String> {
     }
     let raw = serde_json::to_vec(&report).map_err(|e| e.to_string())?;
     let original = super::retain_original(&root, &directory, "producer-seal", &raw)?;
-    let pointer = chrono_harness::prepare_publication(&root, &format!("{directory}seal.json"))?;
+    let pointer = crate::files::prepare_publication(&root, &format!("{directory}seal.json"))?;
     fs::write(
         pointer,
         serde_json::to_vec(&original).map_err(|e| e.to_string())?,

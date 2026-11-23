@@ -39,7 +39,7 @@ fn recovery_and_seal_keep_probe_custody_until_final_consumer_releases() {
         String::from_utf8_lossy(&recovered.stderr)
     );
     assert_eq!(fs::read(&count).unwrap(), b"x");
-    let inventory = chrono_harness::retained_artifacts::retention::Inventory::adopted(root.path())
+    let inventory = cache_host::mock_inventory::Inventory::adopted(root.path())
         .unwrap()
         .unwrap();
     inventory.maintain_at(u64::MAX).unwrap();

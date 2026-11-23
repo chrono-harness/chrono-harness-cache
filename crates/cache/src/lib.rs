@@ -1,11 +1,16 @@
 //! Explicit cache key preparation. A plan is not a cache hit or a build verdict.
 mod attempt;
+pub mod cli;
 mod content;
+mod document;
+mod files;
 mod freshness;
 mod probe;
 mod recovery;
+mod retention;
 pub mod verified_planner;
-use chrono_harness::{decode, file_identity, no_symlink_parents, sha256, wire};
+use document::decode;
+use files::{digest, file_identity, no_symlink_parents, sha256};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
@@ -33,10 +38,10 @@ pub(crate) fn retain_original(
     directory: &str,
     stem: &str,
     raw: &[u8],
-) -> Result<chrono_harness::prepared::Original, String> {
+) -> Result<retention::Original, String> {
     let digest = sha256(raw);
     let path = format!("{directory}{stem}-{digest}.json");
-    let target = chrono_harness::prepare_publication(root, &path)?;
+    let target = files::prepare_publication(root, &path)?;
     match fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -50,7 +55,7 @@ pub(crate) fn retain_original(
         }
         Err(e) => return Err(format!("E_CACHE_ORIGINAL: {e}")),
     }
-    Ok(chrono_harness::prepared::Original {
+    Ok(retention::Original {
         path,
         sha256: digest,
     })
@@ -101,7 +106,7 @@ pub enum Input {
         value: Value,
     },
     Command {
-        command: chrono_harness::CommandSpec,
+        command: retention::CommandSpec,
         inherit: Vec<String>,
         result: probe::ResultKind,
     },
@@ -231,7 +236,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
         }
         let mut seen = BTreeSet::new();
         for source in sources {
-            chrono_harness::relative_path(&source.registry)?;
+            files::relative_path(&source.registry)?;
             if !source.registry.starts_with(".chrono-harness/")
                 || !source.pointer.starts_with('/')
                 || !seen.insert((&source.registry, &source.pointer))
@@ -246,7 +251,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
     if !c.artifact_registry.starts_with(".chrono-harness/") {
         return Err("E_CACHE_CONFIG: artifact registry must belong to host .chrono-harness".into());
     }
-    chrono_harness::relative_path(&c.artifact_registry)?;
+    files::relative_path(&c.artifact_registry)?;
     for (id, input) in &c.inputs {
         name(id)?;
         if let Input::JsonValue { pointer, .. } = input {
@@ -265,7 +270,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
             edges,
         } = input
         {
-            chrono_harness::relative_path(registry)?;
+            files::relative_path(registry)?;
             if !registry.starts_with(".chrono-harness/") || node.is_empty() || edges.is_empty() {
                 return Err("E_CACHE_CONFIG: registered file inputs need a host registry, node and edge kinds".into());
             }
@@ -275,7 +280,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
             command, inherit, ..
         } = input
         {
-            chrono_harness::validate_command(command)?;
+            command.validate()?;
             let mut names = BTreeSet::new();
             for name in inherit {
                 if name.is_empty()
@@ -296,7 +301,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
     for (id, artifact) in &c.artifacts {
         name(id)?;
         name(&artifact.owner)?;
-        chrono_harness::relative_path(&artifact.path).map_err(|e| {
+        files::relative_path(&artifact.path).map_err(|e| {
             format!("E_CACHE_PATH: artifact {id} must be relative to the host: {e}")
         })?;
     }
@@ -437,7 +442,7 @@ fn observe(
             .pointer(pointer)
             .ok_or_else(|| format!("E_CACHE_INPUT: missing JSON value {value}#{pointer}"))?;
         return Ok(json!({"declaration":input,
-            "observation":{"sha256":wire::digest(selected)?},
+            "observation":{"sha256":digest(selected)?},
             "source_file":{"sha256":sha256(&raw),"length":raw.len()}}));
     }
     if let Input::Command {
@@ -496,7 +501,7 @@ fn observe(
                 json!({"presence":"present","sha256":sha256(value.as_bytes()),"length":value.len()})
             }
         },
-        Input::Literal { value } => json!({"declaration_sha256":wire::digest(value)?}),
+        Input::Literal { value } => json!({"declaration_sha256":digest(value)?}),
         Input::RegisteredFiles {
             registry,
             node,
@@ -727,8 +732,8 @@ fn prepare_inputs(
         if cache.refresh_sources {
             identity["source_freshness"] = json!(freshness::METHOD);
         }
-        let compatibility = wire::digest(&identity)?;
-        let source = wire::digest(&values(&cache.source_inputs))?;
+        let compatibility = digest(&identity)?;
+        let source = digest(&values(&cache.source_inputs))?;
         let prefix = format!("chrono-v2-{compatibility}-");
         entries.insert(
             id,
@@ -796,7 +801,7 @@ fn prepare_inputs(
         "planner":current_executable_identity()?,"consumer_operations":operation_contract});
     if c.recover_failed_restores {
         plan["recovery"] = json!({"method":"discard-failed-host-restores","host_root":root,
-            "registration_sha256":wire::digest(c)?});
+            "registration_sha256":digest(c)?});
         if c.recover_unconfirmed_restores {
             plan["recovery"]["unconfirmed"] = json!(true);
         }
@@ -845,7 +850,7 @@ pub fn dispatch(args: &[String]) -> Result<String, String> {
         consumer = options["--consumer"],
         "preparing cache plan"
     );
-    let _activity = chrono_harness::retained_artifacts::retention::read_scope(root)?;
+    let _activity = retention::Session::scope(root)?;
     let config = options["--config"];
     if !config.starts_with(".chrono-harness/") {
         return Err("E_CACHE_CONFIG: registration must belong to host .chrono-harness".into());

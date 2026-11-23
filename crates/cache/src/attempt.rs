@@ -1,8 +1,8 @@
 //! Cache planning owns its original probe attempts; retention owns custody and disposal.
 #![allow(unexpected_cfgs)]
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
 use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -670,8 +670,9 @@ pub(crate) use runtime::{Attempt, prepare, publish_plan, release_plan, validate}
 #[cfg(not(verus_keep_ghost))]
 mod runtime {
     use super as decision;
-    use chrono_harness::retained_artifacts::retention::{Inventory, Publication, unique_path};
-    use chrono_harness::{artifact_disposal::identity, decode, no_symlink_parents, sha256, wire};
+    use crate::{decode, digest, no_symlink_parents, sha256};
+
+    use crate::retention::{Inventory, Publication, identity, unique_path};
     use serde_json::{Value, json};
     use std::{
         cell::Cell,
@@ -687,8 +688,8 @@ mod runtime {
         decision::admit_attempt_inventory(
             (),
             Inventory::adopted(root),
-            |(), state: &Inventory| ((), state.terminal_limits(PRODUCER).is_some()),
-            |(), state: &Inventory| ((), state.terminal_limits("cache-plan").is_some()),
+            |(), state: &Inventory| ((), state.has_terminal_limits(PRODUCER)),
+            |(), state: &Inventory| ((), state.has_terminal_limits("cache-plan")),
         )
         .1
     }
@@ -768,7 +769,7 @@ mod runtime {
         fs::create_dir_all(&store).map_err(|e| e.to_string())?;
         let directory = match output {
             Some(output) => store.join(format!("plan-{}", sha256(output.as_bytes()))),
-            None => unique_path(&store, "attempt-", "")?,
+            None => unique_path(&store)?,
         };
         let relative = directory
             .strip_prefix(&root)
@@ -786,7 +787,7 @@ mod runtime {
         let existing = match rooted {
             Some(record) => Some(record),
             None if state.enrolled(&relative)? => {
-                let status = state.producer_status(PRODUCER, Some(&relative))?;
+                let status = state.producer_status(PRODUCER, &relative)?;
                 status["records"]
                     .as_array()
                     .and_then(|rows| rows.first())
@@ -810,10 +811,7 @@ mod runtime {
                 declared = declared.get("original").unwrap_or(declared);
             }
             if !decision::same_attempt(&relative, Some(&original))
-                || !decision::same_attempt(
-                    &wire::digest(&request)?,
-                    declared["request_sha256"].as_str(),
-                )
+                || !decision::same_attempt(&digest(&request)?, declared["request_sha256"].as_str())
             {
                 return Err(format!(
                     "E_CACHE_ATTEMPT: original request differs; preserve {relative}"
@@ -827,7 +825,7 @@ mod runtime {
         })?;
             let result: Value = decode(&raw)?;
             if !decision::replay_attempt(
-                decision::same_attempt(&wire::digest(&request)?, result["request_sha256"].as_str()),
+                decision::same_attempt(&digest(&request)?, result["request_sha256"].as_str()),
                 result["terminal"] == true,
             ) {
                 return Err(format!(
@@ -836,7 +834,7 @@ mod runtime {
             }
             if phase == "sealing" {
                 state.maintain_originals(std::slice::from_ref(&id))?;
-                let status = state.producer_status(PRODUCER, Some(&relative))?;
+                let status = state.producer_status(PRODUCER, &relative)?;
                 phase = status["records"][0]["phase"]
                     .as_str()
                     .unwrap_or_default()
@@ -848,10 +846,10 @@ mod runtime {
                 }
             }
             if phase == "publishing" {
-                inventory(&root)?.resume_unfinished_directory(PRODUCER, &relative)?
-                .ok_or("E_CACHE_ATTEMPT: unfinished publication unavailable")?
-                .complete_sealed(json!({"request_sha256":wire::digest(&request)?,"result":"result.json","completion":"confirmed"}))
-                .map_err(|error| publication_error(&relative, &error, result["error"].as_str()))?;
+                if !inventory(&root)?.resume(PRODUCER,&relative,json!({"request_sha256":digest(&request)?,"result":"result.json","completion":"confirmed"}))
+                .map_err(|error| publication_error(&relative, &error, result["error"].as_str()))? {
+                    return Err("E_CACHE_ATTEMPT: unfinished publication unavailable".into());
+                }
             }
             if !inventory(&root)?.published_tree_member(
                 PRODUCER,
@@ -871,7 +869,7 @@ mod runtime {
             // producer-owned release obligation after the exact result is
             // verified and consumed.
             if result["error"].is_string() {
-                inventory(&root)?.reference_paths(&role, &[])?;
+                inventory(&root)?.release(&role)?;
             }
             return replay(&result);
         }
@@ -887,12 +885,12 @@ mod runtime {
             "new probe attempt admission returned"
         );
         let intent = json!({"schema":"chrono-cache-attempt/v1","request":request,
-        "request_sha256":wire::digest(&request)?,"updated":timestamp()?,
+        "request_sha256":digest(&request)?,"updated":timestamp()?,
         "task_identity":null,"result":null,"completion":"unknown",
         "wait":"original process engine joins its owned work; missing result cannot be reacquired by redispatch",
         "consumer_role":role});
-        let publication = state.plan_rooted(PRODUCER, &relative, json!({"request_sha256":wire::digest(&request)?,"intent":"intent.json","completion":"not-established"}), &role)?;
-        publication.materialize()?;
+        let publication = state.plan_rooted(PRODUCER, &relative, json!({"request_sha256":digest(&request)?,"intent":"intent.json","completion":"not-established"}), &role)?;
+
         tracing::debug!(
             event_id = "cache.attempt.materialized",
             elapsed_seconds = began.elapsed().as_secs_f64(),
@@ -913,7 +911,7 @@ mod runtime {
             "cache input preparation returned"
         );
         let terminal = !attempt.unknown.get();
-        let receipt = json!({"schema":"chrono-cache-attempt-result/v1","request_sha256":wire::digest(&request)?,
+        let receipt = json!({"schema":"chrono-cache-attempt-result/v1","request_sha256":digest(&request)?,
         "updated":timestamp()?,"terminal":terminal,"plan":result.as_ref().ok(),"error":result.as_ref().err()});
         decision::finalize_cache_attempt(
             attempt,
@@ -932,7 +930,7 @@ mod runtime {
                     });
                 (attempt, recorded)
             },
-            |attempt| (attempt, wire::digest(&request)),
+            |attempt| (attempt, digest(&request)),
             |attempt, request_sha256| {
                 (
                     (),
@@ -949,12 +947,7 @@ mod runtime {
                         }),
                 )
             },
-            |()| {
-                (
-                    (),
-                    inventory(&root).and_then(|state| state.reference_paths(&role, &[])),
-                )
-            },
+            |()| ((), inventory(&root).and_then(|state| state.release(&role))),
         )
         .1
         .map_err(|error| decision::cache_attempt_failure_fragments(&relative, &error).concat())
@@ -998,7 +991,7 @@ mod runtime {
                 return Err("E_CACHE_ATTEMPT: original outside attempt".into());
             }
             let state = inventory(root)?;
-            let status = state.producer_status(PRODUCER, Some(relative))?;
+            let status = state.producer_status(PRODUCER, relative)?;
             let id = status["records"][0]["id"]
                 .as_str()
                 .ok_or("E_CACHE_ATTEMPT: original identity missing")?;
@@ -1018,11 +1011,7 @@ mod runtime {
             )? {
                 return Err("E_CACHE_ATTEMPT: process original is not sealed and bound".into());
             }
-            let process: chrono_harness::ProcessResult = decode(&raw)?;
-            chrono_harness::validate_launch_evidence(
-                &root.join(path.with_file_name("launch.json")),
-                &process,
-            )?;
+            state.session.launch(Path::new(original), &sha256(&raw))?;
             attempts.insert(relative.to_owned());
         }
         for relative in attempts {
@@ -1045,14 +1034,13 @@ mod runtime {
                     "E_CACHE_ATTEMPT: original plan publication differs or is unfinished".into(),
                 );
             }
-            let status = state.producer_status(PRODUCER, Some(&relative))?;
+            let status = state.producer_status(PRODUCER, &relative)?;
             let id = status["records"][0]["id"]
                 .as_str()
                 .ok_or("E_CACHE_ATTEMPT: original owner identity missing")?;
             let _use = state.consume(id)?;
             if decision::release_custody(bound, terminal, sealed, release) {
-                state
-                    .reference_paths(&format!("cache-plan:{}", sha256(relative.as_bytes())), &[])?;
+                state.release(&format!("cache-plan:{}", sha256(relative.as_bytes())))?;
             }
         }
         Ok(())
@@ -1089,13 +1077,12 @@ mod runtime {
             },
             |()| ((), serde_json::to_vec(plan).map_err(|e| e.to_string())),
             |(), raw: &Vec<u8>| {
-                ((), chrono_harness::retained_artifacts::retention::publish_final_original(
+                ((), crate::retention::publish_final(
                     root,
                     "cache-plan",
                     path,
                     raw,
                     json!({"kind":"cache-plan","completion":"confirmed","plan_sha256":sha256(raw)}),
-                    true,
                 ))
             },
             |()| {
@@ -1143,7 +1130,7 @@ mod runtime {
                 (
                     (),
                     state
-                        .producer_status("cache-plan", Some(path))
+                        .producer_status("cache-plan", path)
                         .map(|status| status["records"][0]["id"].as_str().map(str::to_owned)),
                 )
             },
@@ -1151,7 +1138,7 @@ mod runtime {
             |(), state: &Inventory, id: &String, _lease| {
                 (
                     (),
-                    state.reference(&format!("consumer:publication-recheck:{id}"), &[]),
+                    state.release(&format!("consumer:publication-recheck:{id}")),
                 )
             },
         )

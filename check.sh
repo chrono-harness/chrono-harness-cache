@@ -9,7 +9,11 @@ export CARGO_TARGET_DIR="$scratch/cargo"
 cargo fmt --check --manifest-path crates/cache/Cargo.toml
 cargo fmt --check --manifest-path crates/cache-tests/Cargo.toml
 cargo build --locked --manifest-path crates/cache/Cargo.toml
-cargo test --locked --manifest-path crates/cache-tests/Cargo.toml -- --test-threads=2
+cargo build --locked --manifest-path crates/cache-tests/Cargo.toml --bin chrono-cache-mock-owner
+for program in chrono-harness chrono-diagnostics; do
+  ln -s "$CARGO_TARGET_DIR/debug/chrono-cache-mock-owner" "$CARGO_TARGET_DIR/debug/$program"
+done
+PATH="$CARGO_TARGET_DIR/debug:$PATH" cargo test --locked --manifest-path crates/cache-tests/Cargo.toml -- --test-threads=2
 
 prove() {
   local label=$1 root=$2
