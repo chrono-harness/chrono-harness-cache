@@ -1,0 +1,50 @@
+{
+  "schema": "chrono-cache/v2",
+  "namespace": "release",
+  "artifact_registry": ".chrono-harness/build.json",
+  "inputs": {
+    "lock": {
+      "kind": "file",
+      "path": "Cargo.lock",
+      "presence": "present"
+    },
+    "manifest": {
+      "kind": "file",
+      "path": "Cargo.toml",
+      "presence": "present"
+    }
+  },
+  "artifacts": {
+    "target": {
+      "owner": "cache",
+      "path": "target"
+    }
+  },
+  "caches": {
+    "cargo": {
+      "owner": "cache",
+      "producer": "build.cache",
+      "consumers": [
+        "build"
+      ],
+      "artifacts": [
+        "target"
+      ],
+      "compatibility_inputs": [
+        "lock"
+      ],
+      "source_inputs": [
+        "manifest"
+      ],
+      "restore": "exact"
+    }
+  },
+  "consumer_operations": {
+    "build": [
+      {
+        "registry": ".chrono-harness/build.json",
+        "pointer": "/operation"
+      }
+    ]
+  }
+}
