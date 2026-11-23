@@ -1,3 +1,4 @@
+pub(super) use super::cache_host::recover;
 use super::*;
 
 fn bind_installed_planner(plan: &mut Value) {
@@ -35,27 +36,6 @@ fn recovery_host() -> (Host, Value, Value) {
     fs::create_dir_all(root.path().join("out/other")).unwrap();
     fs::write(root.path().join("out/other/keep"), b"other consumer").unwrap();
     (root, config, prepared)
-}
-
-pub(super) fn recover(root: &Path, steps: &Value) -> std::process::Output {
-    Command::new(Path::new(env!("CARGO_BIN_EXE_chrono-cache-test-cli")))
-        .args([
-            "recover",
-            "--host-root",
-            root.to_str().unwrap(),
-            "--config",
-            ".chrono-harness/cache.json",
-            "--plan",
-            ".chrono-harness/state/restore/plan.json",
-            "--steps-env",
-            "CACHE_RECOVERY_STEPS",
-        ])
-        .env(
-            "CACHE_RECOVERY_STEPS",
-            serde_json::to_string(steps).unwrap(),
-        )
-        .output()
-        .unwrap()
 }
 
 fn adopt_source_refresh(root: &Path, config: &mut Value) -> Value {
