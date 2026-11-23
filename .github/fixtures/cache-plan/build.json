@@ -1,0 +1,11 @@
+{
+  "operation": "build.cache",
+  "artifacts": [
+    {
+      "owner": "cache",
+      "path": "target",
+      "kind": "cache",
+      "tracked": false
+    }
+  ]
+}
