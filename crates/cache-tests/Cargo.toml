@@ -6,7 +6,6 @@ publish = false
 autotests = false
 
 [dependencies]
-chrono-test-process = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "5c9364711a47ab45242195f11ca350e5d2b858cf" }
 chrono-cache = { path = "../cache" }
 chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "5c9364711a47ab45242195f11ca350e5d2b858cf" }
 
@@ -26,6 +25,10 @@ bench = false
 [[test]]
 name = "keys"
 path = "tests/keys.rs"
+
+[[test]]
+name = "custody"
+path = "tests/custody.rs"
 
 [[test]]
 name = "verified_planner"

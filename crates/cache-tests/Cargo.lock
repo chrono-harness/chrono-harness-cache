@@ -62,7 +62,6 @@ version = "0.1.0"
 dependencies = [
  "chrono-cache",
  "chrono-harness",
- "chrono-test-process",
  "libc",
  "serde_json",
  "sha2",
@@ -108,14 +107,6 @@ version = "0.1.0"
 source = "git+https://github.com/chrono-harness/chrono-harness-identifiers.git?rev=77f5059bac12d38630ab42a3b6f4ba4222fd7464#77f5059bac12d38630ab42a3b6f4ba4222fd7464"
 dependencies = [
  "verus_builtin_macros",
-]
-
-[[package]]
-name = "chrono-test-process"
-version = "0.1.0"
-source = "git+https://github.com/chrono-harness/chrono-harness-runner.git?rev=5c9364711a47ab45242195f11ca350e5d2b858cf#5c9364711a47ab45242195f11ca350e5d2b858cf"
-dependencies = [
- "chrono-harness",
 ]
 
 [[package]]

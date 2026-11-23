@@ -140,6 +140,12 @@ mod continuity;
 mod recovery;
 
 #[cfg(not(verus_keep_ghost))]
+#[path = "support/cache_host.rs"]
+mod cache_host;
+#[cfg(not(verus_keep_ghost))]
+use cache_host::{Host, fixture, register_artifacts, register_consumer_contract};
+
+#[cfg(not(verus_keep_ghost))]
 use chrono_cache::{Config, prepare};
 #[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
@@ -147,79 +153,6 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 #[cfg(not(verus_keep_ghost))]
 use std::{fs, path::Path, process::Command};
-
-#[cfg(not(verus_keep_ghost))]
-struct Host(tempfile::TempDir);
-
-#[cfg(not(verus_keep_ghost))]
-impl Host {
-    fn new() -> Self {
-        let retained = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../.chrono-harness/state/cache-test-failures");
-        fs::create_dir_all(&retained).unwrap();
-        Self(tempfile::tempdir_in(retained).unwrap())
-    }
-
-    fn path(&self) -> &Path {
-        self.0.path()
-    }
-}
-
-#[cfg(not(verus_keep_ghost))]
-impl Drop for Host {
-    fn drop(&mut self) {
-        if std::thread::panicking() {
-            use std::io::Write;
-            self.0.disable_cleanup(true);
-            let _ = writeln!(
-                std::io::stderr(),
-                "Cache test original host: {}",
-                self.path().display()
-            );
-        }
-    }
-}
-
-#[cfg(not(verus_keep_ghost))]
-fn fixture() -> (Host, Value) {
-    let root = Host::new();
-    fs::create_dir(root.path().join(".chrono-harness")).unwrap();
-    fs::write(
-        root.path().join(".chrono-harness/retention.json"),
-        include_bytes!("fixtures/retention.json"),
-    )
-    .unwrap();
-    fs::write(root.path().join("compiler"), b"compiler-one").unwrap();
-    fs::write(root.path().join("source"), b"source-one").unwrap();
-    let mut config = json!({"schema":"chrono-cache/v2","namespace":"fixture","artifact_registry":".chrono-harness/artifacts.json",
-        "inputs":{
-            "compiler":{"kind":"file","path":"compiler","presence":"present"},
-            "source":{"kind":"file","path":"source","presence":"present"},
-            "profile":{"kind":"literal","value":{"profile":"debug","incremental":true}},
-            "other":{"kind":"file","path":"unavailable-other-input","presence":"present"}},
-        "artifacts":{
-            "target":{"owner":"project","path":"out/project"},
-            "other-target":{"owner":"other","path":"out/other"}},
-        "caches":{
-            "project":{"owner":"project","producer":"build.project","consumers":["check.one","check.two"],
-                "artifacts":["target"],"compatibility_inputs":["compiler","profile"],"source_inputs":["source"],"restore":"compatible"},
-            "other":{"owner":"other","producer":"build.other","consumers":["check.other"],
-                "artifacts":["other-target"],"compatibility_inputs":["compiler"],"source_inputs":["other"],"restore":"exact"}}});
-    register_consumer_contract(root.path(), &mut config);
-    register_artifacts(root.path(), &config);
-    (root, config)
-}
-
-#[cfg(not(verus_keep_ghost))]
-fn register_artifacts(root: &Path, config: &Value) {
-    let rows: Vec<_> = config["artifacts"].as_object().unwrap().values()
-        .map(|a| json!({"path":a["path"],"owner":a["owner"],"kind":"fixture-output","tracked":false})).collect();
-    fs::write(
-        root.join(".chrono-harness/artifacts.json"),
-        serde_json::to_vec(&json!({"artifacts":rows})).unwrap(),
-    )
-    .unwrap();
-}
 
 #[cfg(not(verus_keep_ghost))]
 fn plan(root: &Path, value: &Value, consumer: &str) -> Result<Value, String> {
@@ -263,20 +196,6 @@ fn failed_test_retains_probe_originals_and_success_removes_its_host() {
     let removed = successful.path().to_path_buf();
     drop(successful);
     assert!(!removed.exists());
-}
-
-#[cfg(not(verus_keep_ghost))]
-fn register_consumer_contract(root: &Path, config: &mut Value) {
-    fs::write(
-        root.join(".chrono-harness/operations.json"),
-        br#"{"build":["build.project"],"other":"build.other"}"#,
-    )
-    .unwrap();
-    config["consumer_operations"] = json!({
-        "check.one":[{"registry":".chrono-harness/operations.json","pointer":"/build"}],
-        "check.two":[{"registry":".chrono-harness/operations.json","pointer":"/build"}],
-        "check.other":[{"registry":".chrono-harness/operations.json","pointer":"/other"}]
-    });
 }
 
 #[test]
