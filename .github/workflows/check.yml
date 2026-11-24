@@ -9,11 +9,36 @@ permissions:
 jobs:
   check:
     runs-on: macos-15
+    env:
+      CARGO_TARGET_DIR: target/native-cargo
+      CARGO_HOME: target/cargo-home
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78
         with:
           version: 2026.11.12
           cache: false
-          install_args: http:verus
-      - run: VERUS="$(mise which verus)" ./check.sh
+          install_args: http:chrono-ci http:chrono-cache http:chrono-harness http:verus
+      - name: Verify cache registration and select the installed tools
+        run: |
+          "$(mise which chrono-ci)" verify --host-root . --config .chrono-harness/ci/check.json
+          .chrono-harness/ci/prepare-cargo
+          printf 'VERUS=%s\n' "$(mise which verus)" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/native-check
+      - name: Preserve failing native check originals
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .chrono-harness/state/cache-test-failures/
+            .chrono-harness/state/cache/
+            .chrono-harness/state/cache-probes/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 1
+      - name: Identify compiled executable and incremental artifacts
+        if: success()
+        run: |
+          shasum -a 256 "$CARGO_TARGET_DIR/debug/chrono-cache"
+          du -sk "$CARGO_TARGET_DIR/debug/incremental"
