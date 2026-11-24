@@ -17,10 +17,13 @@ export TMPDIR="$scratch"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$scratch/cargo}"
 mkdir -p "$CARGO_TARGET_DIR"
 CARGO_TARGET_DIR=$(cd "$CARGO_TARGET_DIR" && pwd -P)
+product=crates/cache/Cargo.toml
 if [[ "$phase" != verify ]]; then
   cargo fmt --check --manifest-path crates/cache/Cargo.toml
   cargo fmt --check --manifest-path crates/cache-tests/Cargo.toml
-  cargo build --locked --manifest-path crates/cache/Cargo.toml
+fi
+cargo build --locked --message-format=json-render-diagnostics --manifest-path "$product" > "$scratch/build.jsonl"
+if [[ "$phase" != verify ]]; then
   cargo test --no-run --locked --manifest-path crates/cache-tests/Cargo.toml
   for program in chrono-harness chrono-diagnostics; do
     binding="$CARGO_TARGET_DIR/debug/$program"
@@ -32,20 +35,52 @@ if [[ "$phase" != verify ]]; then
 fi
 PATH="$CARGO_TARGET_DIR/debug:$PATH" cargo test --locked --manifest-path crates/cache-tests/Cargo.toml -- --test-threads=2
 
-prove() {
-  local label=$1 root=$2
-  local output="$scratch/$label.rlib"
-  "${VERUS:-verus}" --crate-type=lib --no-cheating --no-external-by-default --num-threads 2 \
-    --output-json --compile "--emit=link=$output,dep-info=$output.d" "$root" -o "$output" \
-    -Zchecksum-hash-algorithm=sha256 > "$scratch/proof.json" || { cat "$scratch/proof.json" >&2; return 1; }
-  cat "$scratch/proof.json"
-  jq -e '.verus.version == "0.2026.04.24.f8e1704" and
-    .verus.commit == "f8e17045c4ac17a02e566b8997070f2eecc255be" and
-    (."verification-results" | .success == true and ."is-verifying-entire-crate" == true and
-    ."encountered-error" == false and ."encountered-vir-error" == false and
-    .errors == 0 and .verified > 0)' "$scratch/proof.json" >/dev/null
-  test -s "$output" && test -s "$output.d"
+
+coverage_failure() {
+  echo "E_VERUS_COVERAGE: $*" >&2
+  exit 1
 }
 
-prove verify.cache-planner crates/cache/src/verified_planner.rs
-prove verify.cache-planner-tests crates/cache-tests/tests/verified_planner.rs
+prove() {
+  local label=$1 root=$2
+  local output="$scratch/$label.rlib" report="$scratch/$label.json"
+  "${VERUS:-verus}" --crate-type=lib --no-cheating --no-external-by-default --num-threads 2 \
+    --output-json --compile "--emit=link=$output,dep-info=$output.d" "$root" -o "$output" \
+    -Zchecksum-hash-algorithm=sha256 > "$report" || { cat "$report" >&2; coverage_failure "$label: verifier failed"; }
+}
+
+admit_proof() {
+  local label=$1
+  shift
+  chrono-host-bootstrap check-compiler-proof \
+    0.2026.04.24.f8e1704 f8e17045c4ac17a02e566b8997070f2eecc255be \
+    "$scratch/$label.json" "$scratch/$label.rlib" "$@" ||
+    coverage_failure "$label: required proof result was not admitted"
+}
+
+# Read the exact library selected by Cargo in the build of the tested executable.
+metadata=$(jq -ers --arg manifest "$(pwd -P)/$product" '
+  [.[] | select(.reason == "compiler-artifact" and .manifest_path == $manifest
+                 and .target.kind == ["lib"]) | .filenames[] | select(endswith(".rmeta"))]
+  | if length == 1 then .[0] else error("expected the product library") end
+' "$scratch/build.jsonl") || coverage_failure "native library was not identified"
+filename=${metadata##*/}
+stem=${filename#lib}
+stem=${metadata%/*}/${stem%.rmeta}
+chrono-host-bootstrap check-compiler-sources native "$stem" src/verified_planner.rs src/verified_content.rs src/attempt.rs \
+  src/recovery.rs src/content.rs src/probe.rs \
+  src/lib.rs ||
+  coverage_failure "native library differs from required sources"
+
+src=crates/cache/src
+tests=crates/cache-tests/tests
+included="$tests/../../cache/src"
+prove verify.cache-planner "$src/verified_planner.rs"
+prove verify.cache-planner-tests "$tests/verified_planner.rs"
+
+admit_proof verify.cache-planner "$src/verified_planner.rs" "$src/verified_content.rs" \
+  "$src/attempt.rs" "$src/recovery.rs"
+admit_proof verify.cache-planner-tests "$tests/verified_planner.rs" "$included/verified_planner.rs" \
+  "$included/verified_content.rs" "$included/attempt.rs" \
+  "$included/recovery.rs" "$tests/continuity.rs" \
+  "$tests/keys.rs" "$tests/support/probe.rs"
