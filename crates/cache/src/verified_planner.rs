@@ -52,6 +52,49 @@ pub use recovery_source::*;
 
 verus! {
 
+pub open spec fn path_line_break(byte: u8) -> bool {
+    byte == 10 || byte == 13
+}
+
+pub open spec fn single_absolute_path(raw: Seq<u8>, end: int) -> bool {
+    0 < end <= raw.len() && raw[0] == 47
+    && (forall|i:int| 0 <= i < end ==> !path_line_break(raw[i]) && raw[i] != 0)
+    && (forall|i:int| end <= i < raw.len() ==> path_line_break(raw[i]))
+}
+
+/// File-path probes run on POSIX hosts. Keep every byte except trailing CR/LF.
+pub fn probe_path_end(raw: &[u8]) -> (result: Option<usize>)
+    ensures
+        result.is_some() ==> single_absolute_path(raw@, result.unwrap() as int),
+        result.is_none() ==> forall|end:int| !single_absolute_path(raw@, end),
+{
+    if raw.len() == 0 || raw[0] != 47 { return None; }
+    let mut end = raw.len();
+    while end > 0 && (raw[end - 1] == 10 || raw[end - 1] == 13)
+        invariant end <= raw.len(), raw.len() > 0, raw@[0] == 47,
+            forall|i:int| end <= i < raw.len() ==> path_line_break(raw@[i]),
+        decreases end,
+    { end -= 1; }
+    assert(end > 0);
+    let mut i = 0;
+    while i < end
+        invariant 0 < end <= raw.len(), raw@[0] == 47, i <= end,
+            !path_line_break(raw@[end - 1]),
+            forall|j:int| 0 <= j < i ==> !path_line_break(raw@[j]) && raw@[j] != 0,
+            forall|j:int| end <= j < raw.len() ==> path_line_break(raw@[j]),
+        decreases end - i,
+    {
+        if raw[i] == 0 || raw[i] == 10 || raw[i] == 13 {
+            assert forall|k:int| !single_absolute_path(raw@, k) by {
+                if k <= i { assert(k <= end - 1 < raw.len()); }
+            }
+            return None;
+        }
+        i += 1;
+    }
+    Some(end)
+}
+
 pub open spec fn restore_prefix_matches(key: &str, prefix: Option<&str>) -> bool {
     match prefix {
         Some(prefix) => prefix.spec_bytes().len() > 0

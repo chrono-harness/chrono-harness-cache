@@ -3611,6 +3611,38 @@ fn expect_cache_true(actual: bool)
     }
 }
 
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn file_probe_selects_one_absolute_line_and_trims_the_terminator() {
+    broadcast use vstd::array::group_array_axioms;
+    let path = [47u8, 206, 187, 13, 10, 10];
+    let multiline = [47u8, 10, 47];
+    let nul = [47u8, 0];
+    let relative = [120u8, 10];
+    let empty: [u8;0] = [];
+    let out = policy::probe_path_end(&path);
+    proof {
+        assert forall|i:int| 0 <= i < 3 implies !policy::path_line_break(path@[i]) && path@[i] != 0 by {}
+        assert forall|i:int| 3 <= i < 6 implies policy::path_line_break(path@[i]) by {}
+        assert(policy::single_absolute_path(path@,3));
+        assert forall|k:int| policy::single_absolute_path(path@,k) implies k == 3 by {
+            if k < 3 { assert(!policy::path_line_break(path@[2])); }
+            if k > 3 { assert(policy::path_line_break(path@[3])); }
+        }
+        assert forall|k:int| !policy::single_absolute_path(multiline@,k) by {
+            if k <= 1 { assert(!policy::path_line_break(multiline@[2])); }
+            else { assert(policy::path_line_break(multiline@[1])); }
+        }
+        assert forall|k:int| !policy::single_absolute_path(nul@,k) by {
+            assert(!policy::path_line_break(nul@[1]));
+        }
+    }
+    expect_cache_true(matches!(out, Some(3)));
+    expect_cache_true(policy::probe_path_end(&multiline).is_none());
+    expect_cache_true(policy::probe_path_end(&nul).is_none());
+    expect_cache_true(policy::probe_path_end(&relative).is_none());
+    expect_cache_true(policy::probe_path_end(&empty).is_none());
+}
+
 fn expect_registration(schema: &str, expected: bool)
     requires expected == (schema@ == "chrono-cache/v2"@),
 {

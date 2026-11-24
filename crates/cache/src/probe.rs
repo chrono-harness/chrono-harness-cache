@@ -141,15 +141,11 @@ pub fn observe(
         "stderr_sha256":process.stderr_sha256,"stderr_length":process.stderr_bytes.len()});
     if matches!(result, ResultKind::FilePath) {
         let value = std::str::from_utf8(&process.stdout_bytes)
-            .map_err(|e| format!("E_CACHE_PROBE: path encoding: {e}; original {original}"))?
-            .trim_end_matches(['\n', '\r']);
-        if value.is_empty() || value.contains(['\n', '\r', '\0']) || !Path::new(value).is_absolute()
-        {
-            return Err(format!(
-                "E_CACHE_PROBE: expected one absolute file path; original {original}"
-            ));
-        }
-        let actual = fs::canonicalize(value)
+            .map_err(|e| format!("E_CACHE_PROBE: path encoding: {e}; original {original}"))?;
+        let end = super::verified_planner::probe_path_end(value.as_bytes()).ok_or_else(|| {
+            format!("E_CACHE_PROBE: expected one absolute file path; original {original}")
+        })?;
+        let actual = fs::canonicalize(&value[..end])
             .map_err(|e| format!("E_CACHE_PROBE: {e}; original {original}"))?;
         let (digest, length) = file_identity(&actual)
             .map_err(|e| format!("E_CACHE_PROBE: {e}; original {original}"))?;
