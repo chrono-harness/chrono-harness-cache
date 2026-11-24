@@ -108,6 +108,8 @@ fn main() {
             std::fs::write(&args[1], b"fixture publication conflict").unwrap();
             println!("original observed output");
         }
+        "invalid-encoding" => std::io::stdout().write_all(&[255]).unwrap(),
+        "embedded-nul" => std::io::stdout().write_all(b"/one\0two").unwrap(),
         "echo" | "file" => println!("{}", args[1]),
         "exit" | "seal-failure" => {
             if let Some(count) = args.get(1) {

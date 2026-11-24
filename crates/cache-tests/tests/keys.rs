@@ -828,6 +828,36 @@ fn github_outputs_preserve_selected_paths_and_never_publish_a_failed_plan() {
 
 #[test]
 #[cfg(not(verus_keep_ghost))]
+fn rejected_file_probe_reports_its_original_and_lexical_failure() {
+    for (mode, arg, expected) in [
+        ("echo", "", "expected one absolute file path"),
+        ("echo", "relative", "expected one absolute file path"),
+        ("echo", "/first\n/second", "expected one absolute file path"),
+        ("invalid-encoding", "", "path encoding"),
+        ("embedded-nul", "", "expected one absolute file path"),
+    ] {
+        let (root, mut config) = fixture();
+        config["inputs"]["compiler"] = json!({"kind":"command", "command":{
+            "program":env!("CARGO_BIN_EXE_chrono-cache-test-probe"), "args":[mode,arg],
+            "env":{},"timeout_seconds":2,"output_limit_bytes":4096},"inherit":[],"result":"file-path"});
+        let error = plan(root.path(), &config, "check.one").unwrap_err();
+        assert!(error.contains(expected), "{error}");
+        let original = error
+            .split("original ")
+            .nth(1)
+            .unwrap()
+            .split_whitespace()
+            .next()
+            .unwrap();
+        assert!(
+            root.path().join(original.trim_end_matches(';')).is_file(),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+#[cfg(not(verus_keep_ghost))]
 fn registered_probe_binds_actual_selected_compiler_bytes_with_stable_keys() {
     let (root, mut config) = fixture();
     let compiler = root.path().join("compiler");
