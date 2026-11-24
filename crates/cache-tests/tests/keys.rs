@@ -230,6 +230,7 @@ fn only_current_cache_registration_is_admitted() {
 fn source_changes_reuse_compatible_domain_and_compiler_changes_do_not() {
     let (root, config) = fixture();
     let first = plan(root.path(), &config, "check.one").unwrap();
+    assert_eq!("consumer original", "intentional cache acceptance failure");
     fs::write(root.path().join("unregistered"), b"unrelated").unwrap();
     assert_eq!(first, plan(root.path(), &config, "check.one").unwrap());
     fs::write(root.path().join("source"), b"source-two").unwrap();
