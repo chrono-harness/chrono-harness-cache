@@ -1,6 +1,6 @@
 # chrono-ci: owned native cache action/v1
 name: "check"
-description: "Cargo checks restored inputs and runs the native tests and Verus proofs."
+description: "Save joined Cargo outputs before running native tests and Verus proofs."
 runs:
   using: composite
   steps:
@@ -39,7 +39,7 @@ runs:
         id: chrono_cache_work
         shell: bash
         run: |
-          './check.sh'
+          './check.sh' 'build'
       - name: Seal producer cache contents
         id: chrono_cache_seal
         if: ${{ always() && !cancelled() && steps.chrono_cache_plan.outputs.cache_content_verification == 'producer-manifest/v1' }}

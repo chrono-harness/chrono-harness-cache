@@ -3,7 +3,8 @@
   "jobs": {
     "check": {
       "command": [
-        "./check.sh"
+        "./check.sh",
+        "build"
       ],
       "action_path": ".github/actions/native-check/action.yml"
     }
@@ -18,7 +19,7 @@
     "jobs": {
       "check": {
         "need": "Reuse compilations of the cache binary and its dedicated Rust tests.",
-        "output_use": "Cargo checks restored inputs and runs the native tests and Verus proofs.",
+        "output_use": "Save joined Cargo outputs before running native tests and Verus proofs.",
         "consumer": "native-check",
         "prepare": [
           "mkdir",
