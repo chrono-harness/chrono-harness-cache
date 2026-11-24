@@ -1,0 +1,28 @@
+{
+  "operation": "check.cache",
+  "build": {
+    "incremental": "1",
+    "profile": "dev/test",
+    "features": "default"
+  },
+  "artifacts": [
+    {
+      "owner": "cache",
+      "path": "target/native-cargo",
+      "kind": "cache",
+      "tracked": false
+    },
+    {
+      "owner": "cache",
+      "path": "target/cargo-home/registry/cache",
+      "kind": "cache",
+      "tracked": false
+    },
+    {
+      "owner": "cache",
+      "path": "target/cargo-home/registry/index",
+      "kind": "cache",
+      "tracked": false
+    }
+  ]
+}

@@ -1,0 +1,438 @@
+{
+  "schema": "chrono-cache/v2",
+  "namespace": "chrono-cache-native",
+  "artifact_registry": ".chrono-harness/ci/cargo.json",
+  "require_primary_checkout": true,
+  "recover_failed_restores": true,
+  "recover_unconfirmed_restores": true,
+  "inputs": {
+    "product.lock": {
+      "kind": "file",
+      "path": "crates/cache/Cargo.lock",
+      "presence": "present"
+    },
+    "tests.lock": {
+      "kind": "file",
+      "path": "crates/cache-tests/Cargo.lock",
+      "presence": "present"
+    },
+    "product.manifest": {
+      "kind": "file",
+      "path": "crates/cache/Cargo.toml",
+      "presence": "present"
+    },
+    "tests.manifest": {
+      "kind": "file",
+      "path": "crates/cache-tests/Cargo.toml",
+      "presence": "present"
+    },
+    "toolchain": {
+      "kind": "file",
+      "path": "rust-toolchain.toml",
+      "presence": "present"
+    },
+    "check": {
+      "kind": "file",
+      "path": "check.sh",
+      "presence": "present"
+    },
+    "cargo-config": {
+      "kind": "file",
+      "path": ".cargo/config",
+      "presence": "absent"
+    },
+    "cargo-config-toml": {
+      "kind": "file",
+      "path": ".cargo/config.toml",
+      "presence": "absent"
+    },
+    "build": {
+      "kind": "json-value",
+      "path": ".chrono-harness/ci/cargo.json",
+      "pointer": "/build"
+    },
+    "env.CARGO_INCREMENTAL": {
+      "kind": "environment",
+      "name": "CARGO_INCREMENTAL",
+      "presence": "present"
+    },
+    "env.CARGO_TARGET_DIR": {
+      "kind": "environment",
+      "name": "CARGO_TARGET_DIR",
+      "presence": "present"
+    },
+    "env.CARGO_HOME": {
+      "kind": "environment",
+      "name": "CARGO_HOME",
+      "presence": "present"
+    },
+    "env.CARGO_BUILD_TARGET": {
+      "kind": "environment",
+      "name": "CARGO_BUILD_TARGET",
+      "presence": "absent"
+    },
+    "env.RUSTFLAGS": {
+      "kind": "environment",
+      "name": "RUSTFLAGS",
+      "presence": "absent"
+    },
+    "env.CARGO_ENCODED_RUSTFLAGS": {
+      "kind": "environment",
+      "name": "CARGO_ENCODED_RUSTFLAGS",
+      "presence": "absent"
+    },
+    "env.RUSTC_WRAPPER": {
+      "kind": "environment",
+      "name": "RUSTC_WRAPPER",
+      "presence": "absent"
+    },
+    "env.RUSTC_WORKSPACE_WRAPPER": {
+      "kind": "environment",
+      "name": "RUSTC_WORKSPACE_WRAPPER",
+      "presence": "absent"
+    },
+    "env.RUSTC": {
+      "kind": "environment",
+      "name": "RUSTC",
+      "presence": "absent"
+    },
+    "rustc": {
+      "kind": "command",
+      "command": {
+        "program": ".chrono-harness/ci/toolchain",
+        "args": [
+          "rustc"
+        ],
+        "env": {},
+        "timeout_seconds": 30,
+        "output_limit_bytes": 16384
+      },
+      "inherit": [
+        "CHRONO_RUSTUP",
+        "HOME",
+        "RUSTUP_HOME"
+      ],
+      "result": "file-path"
+    },
+    "cargo": {
+      "kind": "command",
+      "command": {
+        "program": ".chrono-harness/ci/toolchain",
+        "args": [
+          "cargo"
+        ],
+        "env": {},
+        "timeout_seconds": 30,
+        "output_limit_bytes": 16384
+      },
+      "inherit": [
+        "CHRONO_RUSTUP",
+        "HOME",
+        "RUSTUP_HOME"
+      ],
+      "result": "file-path"
+    },
+    "platform": {
+      "kind": "command",
+      "command": {
+        "program": "/usr/bin/uname",
+        "args": [
+          "-smr"
+        ],
+        "env": {},
+        "timeout_seconds": 30,
+        "output_limit_bytes": 16384
+      },
+      "inherit": [],
+      "result": "stdout"
+    },
+    "sdk": {
+      "kind": "command",
+      "command": {
+        "program": "/usr/bin/xcrun",
+        "args": [
+          "--sdk",
+          "macosx",
+          "--show-sdk-build-version"
+        ],
+        "env": {},
+        "timeout_seconds": 30,
+        "output_limit_bytes": 16384
+      },
+      "inherit": [
+        "DEVELOPER_DIR"
+      ],
+      "result": "stdout"
+    },
+    "cc": {
+      "kind": "command",
+      "command": {
+        "program": "/usr/bin/xcrun",
+        "args": [
+          "--find",
+          "clang"
+        ],
+        "env": {},
+        "timeout_seconds": 30,
+        "output_limit_bytes": 16384
+      },
+      "inherit": [
+        "DEVELOPER_DIR"
+      ],
+      "result": "file-path"
+    },
+    "ld": {
+      "kind": "command",
+      "command": {
+        "program": "/usr/bin/xcrun",
+        "args": [
+          "--find",
+          "ld"
+        ],
+        "env": {},
+        "timeout_seconds": 30,
+        "output_limit_bytes": 16384
+      },
+      "inherit": [
+        "DEVELOPER_DIR"
+      ],
+      "result": "file-path"
+    },
+    "source.crates.cache-tests.tests.continuity.rs": {
+      "kind": "file",
+      "path": "crates/cache-tests/tests/continuity.rs",
+      "presence": "present"
+    },
+    "source.crates.cache-tests.tests.custody.rs": {
+      "kind": "file",
+      "path": "crates/cache-tests/tests/custody.rs",
+      "presence": "present"
+    },
+    "source.crates.cache-tests.tests.fixtures.retention.json": {
+      "kind": "file",
+      "path": "crates/cache-tests/tests/fixtures/retention.json",
+      "presence": "present"
+    },
+    "source.crates.cache-tests.tests.keys.rs": {
+      "kind": "file",
+      "path": "crates/cache-tests/tests/keys.rs",
+      "presence": "present"
+    },
+    "source.crates.cache-tests.tests.recovery.rs": {
+      "kind": "file",
+      "path": "crates/cache-tests/tests/recovery.rs",
+      "presence": "present"
+    },
+    "source.crates.cache-tests.tests.support.cache_host.rs": {
+      "kind": "file",
+      "path": "crates/cache-tests/tests/support/cache_host.rs",
+      "presence": "present"
+    },
+    "source.crates.cache-tests.tests.support.mock_inventory.rs": {
+      "kind": "file",
+      "path": "crates/cache-tests/tests/support/mock_inventory.rs",
+      "presence": "present"
+    },
+    "source.crates.cache-tests.tests.support.mock_owner.rs": {
+      "kind": "file",
+      "path": "crates/cache-tests/tests/support/mock_owner.rs",
+      "presence": "present"
+    },
+    "source.crates.cache-tests.tests.support.probe.rs": {
+      "kind": "file",
+      "path": "crates/cache-tests/tests/support/probe.rs",
+      "presence": "present"
+    },
+    "source.crates.cache-tests.tests.verified_planner.rs": {
+      "kind": "file",
+      "path": "crates/cache-tests/tests/verified_planner.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.attempt.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/attempt.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.cli.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/cli.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.content.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/content.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.document.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/document.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.files.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/files.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.freshness.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/freshness.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.lib.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/lib.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.main.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/main.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.probe.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/probe.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.recovery.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/recovery.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.retention.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/retention.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.verified_content.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/verified_content.rs",
+      "presence": "present"
+    },
+    "source.crates.cache.src.verified_planner.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/verified_planner.rs",
+      "presence": "present"
+    },
+    "cargo-home-config": {
+      "kind": "file",
+      "path": "target/cargo-home/config",
+      "presence": "absent"
+    },
+    "cargo-home-config-toml": {
+      "kind": "file",
+      "path": "target/cargo-home/config.toml",
+      "presence": "absent"
+    }
+  },
+  "artifacts": {
+    "rust-objects": {
+      "owner": "cache",
+      "path": "target/native-cargo"
+    },
+    "crates-packages": {
+      "owner": "cache",
+      "path": "target/cargo-home/registry/cache"
+    },
+    "crates-index": {
+      "owner": "cache",
+      "path": "target/cargo-home/registry/index"
+    }
+  },
+  "caches": {
+    "cargo-download": {
+      "owner": "cache",
+      "producer": "check.cache",
+      "consumers": [
+        "native-check"
+      ],
+      "artifacts": [
+        "crates-index",
+        "crates-packages"
+      ],
+      "compatibility_inputs": [
+        "cargo",
+        "platform"
+      ],
+      "source_inputs": [
+        "product.lock",
+        "tests.lock"
+      ],
+      "restore": "exact",
+      "verify_contents": true
+    },
+    "cargo-target": {
+      "owner": "cache",
+      "producer": "check.cache",
+      "consumers": [
+        "native-check"
+      ],
+      "artifacts": [
+        "rust-objects"
+      ],
+      "compatibility_inputs": [
+        "product.lock",
+        "tests.lock",
+        "product.manifest",
+        "tests.manifest",
+        "toolchain",
+        "check",
+        "cargo-config",
+        "cargo-config-toml",
+        "build",
+        "env.CARGO_INCREMENTAL",
+        "env.CARGO_TARGET_DIR",
+        "env.CARGO_HOME",
+        "env.CARGO_BUILD_TARGET",
+        "env.RUSTFLAGS",
+        "env.CARGO_ENCODED_RUSTFLAGS",
+        "env.RUSTC_WRAPPER",
+        "env.RUSTC_WORKSPACE_WRAPPER",
+        "env.RUSTC",
+        "rustc",
+        "cargo",
+        "platform",
+        "sdk",
+        "cc",
+        "ld",
+        "cargo-home-config",
+        "cargo-home-config-toml"
+      ],
+      "source_inputs": [
+        "source.crates.cache-tests.tests.continuity.rs",
+        "source.crates.cache-tests.tests.custody.rs",
+        "source.crates.cache-tests.tests.fixtures.retention.json",
+        "source.crates.cache-tests.tests.keys.rs",
+        "source.crates.cache-tests.tests.recovery.rs",
+        "source.crates.cache-tests.tests.support.cache_host.rs",
+        "source.crates.cache-tests.tests.support.mock_inventory.rs",
+        "source.crates.cache-tests.tests.support.mock_owner.rs",
+        "source.crates.cache-tests.tests.support.probe.rs",
+        "source.crates.cache-tests.tests.verified_planner.rs",
+        "source.crates.cache.src.attempt.rs",
+        "source.crates.cache.src.cli.rs",
+        "source.crates.cache.src.content.rs",
+        "source.crates.cache.src.document.rs",
+        "source.crates.cache.src.files.rs",
+        "source.crates.cache.src.freshness.rs",
+        "source.crates.cache.src.lib.rs",
+        "source.crates.cache.src.main.rs",
+        "source.crates.cache.src.probe.rs",
+        "source.crates.cache.src.recovery.rs",
+        "source.crates.cache.src.retention.rs",
+        "source.crates.cache.src.verified_content.rs",
+        "source.crates.cache.src.verified_planner.rs"
+      ],
+      "restore": "compatible",
+      "verify_contents": true,
+      "refresh_sources": true
+    }
+  },
+  "consumer_operations": {
+    "native-check": [
+      {
+        "registry": ".chrono-harness/ci/cargo.json",
+        "pointer": "/operation"
+      }
+    ]
+  }
+}
