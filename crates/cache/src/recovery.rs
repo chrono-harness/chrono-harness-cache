@@ -2139,6 +2139,21 @@ pub(crate) fn dispatch(args: &[String]) -> Result<String, String> {
             (report, published)
         },
         |report, original| {
+            for (id, cache) in report["caches"].as_object().unwrap() {
+                if cache["status"] == "discarded" {
+                    tracing::warn!(
+                        event_id = "cache.restore.recovered",
+                        cache_id = id.as_str(),
+                        restore_outcome = cache["restore"]["outcome"].as_str(),
+                        reason = cache["reason"].as_str(),
+                        verification = cache["verification"]["status"].as_str(),
+                        action = cache["status"].as_str(),
+                        report_path = original.path.as_str(),
+                        report_sha256 = original.sha256.as_str(),
+                        "discarded unusable cache before registered build"
+                    );
+                }
+            }
             eprintln!(
                 "W_CACHE_RESTORE_RECOVERED: unusable restore outputs cleared before registered build; original {}",
                 original.path
