@@ -14,4 +14,4 @@
 
 本仓的 macOS 原生检查通过 `.chrono-harness/ci/check.json` 登记唯一保存作业。宿主安装的 `chrono-ci generate` 和 `verify` 生成、核对 `.github/actions/native-check/action.yml`。原命令仍是 `./check.sh`。计划按 `.chrono-harness/cache.json` 绑定本仓锁文件、清单、源文件、编译器、平台、链接器、SDK 和生效的增量设置。相同编译配置下可以恢复旧源码的 Cargo 产物，然后重跑构建、测试和证明。
 
-依赖包和索引在 `target/cargo-home/registry`，编译产物在 `target/native-cargo`，本轮检查原件在 `.chrono-harness/state/cache`，分别由恢复步骤、Cargo 和本轮诊断消费。GitHub 仓库的缓存保留上限为 7 天，每个托管 job 使用独立检出。计划和恢复报告随本轮检出回收。遇到非零或校验错误，GitHub 作业日志保存本次处理结果。
+依赖包和索引在 `target/cargo-home/registry`，编译产物在 `target/native-cargo`，本轮检查原件在 `.chrono-harness/state/cache`，分别由恢复步骤、Cargo 和本轮诊断消费。GitHub 仓库的缓存保留上限为 7 天，每个托管 job 使用独立检出。成功作业的计划和恢复报告随本轮检出回收；失败作业把诊断原件上传至 GitHub，保留 1 天。遇到非零或校验错误，GitHub 作业日志保存本次处理结果。
