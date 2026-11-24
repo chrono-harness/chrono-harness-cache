@@ -194,6 +194,16 @@ fn result(root: &Path) -> Value {
 #[test]
 fn failed_restore_clears_only_its_registered_artifacts_and_does_not_repeat_after_build() {
     let (root, _, _) = recovery_host();
+    let log_dir = ".chrono-harness/state/recovery-logs/";
+    fs::write(
+        root.path().join(".chrono-harness/logging.json"),
+        serde_json::to_vec(&json!({
+            "schema":"chrono-runtime-logging/v1","level":"warn","directory":log_dir,
+            "max_bytes":8192,"max_files":2,"stderr":false
+        }))
+        .unwrap(),
+    )
+    .unwrap();
     #[cfg(unix)]
     std::os::unix::fs::symlink(
         root.path().join("source"),
@@ -216,6 +226,31 @@ fn failed_restore_clears_only_its_registered_artifacts_and_does_not_repeat_after
     assert_eq!(fs::read(root.path().join("source")).unwrap(), b"source-one");
     let report = result(root.path());
     assert_eq!(report["status"], "recovered");
+    let pointer: Value = serde_json::from_slice(&recovered.stdout).unwrap();
+    let log = fs::read_dir(root.path().join(log_dir))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap();
+    let log = fs::read_to_string(log.path()).unwrap();
+    let fields = log
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .map(|frame| frame["event"]["new_event"]["values"].clone())
+        .find(|values| values["event_id"]["string"] == "cache.restore.recovered")
+        .expect("recovery must reach the adopted diagnostics sink");
+    assert_eq!(fields["cache_id"]["string"], "project");
+    assert_eq!(fields["restore_outcome"]["string"], "failure");
+    assert_eq!(
+        fields["reason"]["string"],
+        report["caches"]["project"]["reason"]
+    );
+    assert_eq!(fields["action"]["string"], "discarded");
+    assert_eq!(fields["report_path"]["string"], pointer["report"]["path"]);
+    assert_eq!(
+        fields["report_sha256"]["string"],
+        pointer["report"]["sha256"]
+    );
     assert_eq!(
         report["caches"]["project"]["restore"],
         steps["cache_0_restore"]
