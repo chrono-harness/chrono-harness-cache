@@ -1278,3 +1278,27 @@ fn registered_producer_mock_preserves_source_refresh_and_compatible_domain() {
         incompatible["caches"]["check.cache-tests"]["restore_keys"]
     );
 }
+
+#[cfg(all(unix, not(verus_keep_ghost)))]
+#[test]
+fn invalid_native_argument_in_an_unadopted_host_retains_its_original_bytes() {
+    use std::os::unix::ffi::OsStringExt;
+    let host = tempfile::tempdir().unwrap();
+    let run = std::process::Command::new(env!("CARGO_BIN_EXE_chrono-cache-test-cli"))
+        .current_dir(host.path())
+        .env_clear()
+        .arg("plan")
+        .arg(std::ffi::OsString::from_vec(vec![201, 255]))
+        .output()
+        .unwrap();
+    assert_eq!(run.status.code(), Some(2));
+    assert!(run.stdout.is_empty());
+    let diag: serde_json::Value = serde_json::from_slice(&run.stderr).unwrap();
+    assert_eq!(diag["error"]["code"], "E_USAGE");
+    assert_eq!(diag["error"]["context"]["argv_index"], 2);
+    assert_eq!(diag["error"]["context"]["argument_index"], 1);
+    assert_eq!(
+        diag["error"]["context"]["argument_bytes"],
+        serde_json::json!([201, 255])
+    );
+}

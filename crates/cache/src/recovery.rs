@@ -5,9 +5,9 @@
 use super as planner;
 #[cfg(not(verus_keep_ghost))]
 use crate::verified_planner as planner;
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
 use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -1757,7 +1757,9 @@ pub fn admit_recovery_replay<'a>(report: &RecoveryReplay, path: &str,
 }
 
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{decode, no_symlink_parents, prepared, sha256};
+use crate::retention as prepared;
+#[cfg(not(verus_keep_ghost))]
+use crate::{decode, no_symlink_parents, sha256};
 #[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
 #[cfg(not(verus_keep_ghost))]
@@ -1775,7 +1777,7 @@ fn restore_prefixes(cache: &Value) -> Vec<Option<&str>> {
 
 #[cfg(not(verus_keep_ghost))]
 fn publish_once(root: &Path, path: &str, bytes: &[u8]) -> Result<(), String> {
-    let destination = chrono_harness::prepare_publication(root, path)?;
+    let destination = crate::files::prepare_publication(root, path)?;
     fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -1796,7 +1798,7 @@ fn retained(root: &Path, plan_path: &str) -> Result<(prepared::Original, Value),
     )?)
     .map_err(|e| format!("E_CACHE_RECOVERY: missing recovery result: {e}"))?;
     let original: prepared::Original = decode(&pointer)?;
-    let raw = prepared::read_original(root, &original, None)?;
+    let raw = prepared::read_original(root, &original)?;
     Ok((original, decode(&raw)?))
 }
 
@@ -1805,7 +1807,7 @@ pub(crate) fn dispatch(args: &[String]) -> Result<String, String> {
     let options = parse_recovery_options(args)?;
     let root = fs::canonicalize(options.required(&RecoveryOption::HostRoot)?)
         .map_err(|e| e.to_string())?;
-    let _activity = chrono_harness::retained_artifacts::retention::read_scope(&root)?;
+    let _activity = crate::retention::Session::scope(&root)?;
     let config_path = options.required(&RecoveryOption::Config)?;
     let plan_path = options.required(&RecoveryOption::Plan)?;
     admit_recovery_paths(config_path, plan_path)?;

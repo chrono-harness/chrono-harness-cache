@@ -39,6 +39,11 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78
+        with:
+          version: 2026.11.12
+          cache: false
+          install_args: http:chrono-harness http:chrono-diagnostics
       - name: Build and exercise the release binary
         shell: bash
         env:
@@ -59,6 +64,26 @@ jobs:
           "$binary" plan --host-root "$host" --config .chrono-harness/cache.json --consumer unknown 2>"$host/error" || code=$?
           test "$code" = 2
           test -s "$host/error"
+          cp crates/cache-tests/tests/fixtures/retention.json "$host/.chrono-harness/retention.json"
+          jq --arg program "$(command -v uname)" '
+            def probe($arg): {kind:"command",command:{program:$program,args:[$arg],env:{},timeout_seconds:10,output_limit_bytes:4096},inherit:[],result:"stdout"};
+            .inputs.lock=probe("-s") | .inputs.manifest=probe("-m")
+          ' .github/fixtures/cache-plan/cache.json > "$host/.chrono-harness/cache.json"
+          printf '%s\n' '{"schema":"chrono-runtime-logging/v1","level":"debug","directory":".chrono-harness/logs/","max_bytes":1048576,"max_files":2,"keep_seconds":3600,"stderr":false}' > "$host/.chrono-harness/logging.json"
+          output=.chrono-harness/state/cache/release/plan.json
+          for pass in first replay; do
+            "$binary" plan --host-root "$host" --config .chrono-harness/cache.json --consumer build --plan-output "$output" > "$host/$pass.json"
+          done
+          cmp "$host/first.json" "$host/replay.json"
+          test "$(jq '.inputs | length' "$host/first.json")" = 2
+          for input in lock manifest; do
+            original=$(jq -er --arg input "$input" '.inputs[$input].original.path' "$host/first.json")
+            expected=$(jq -er --arg input "$input" '.inputs[$input].original.sha256' "$host/first.json")
+            jq -e '.exit_code == 0 and .owned_work_joined and .child_pid > 0' "$host/$original"
+            jq -e --slurpfile receipt "$host/$original" '.child_pid == $receipt[0].child_pid and .sha256 == $receipt[0].sha256' "$host/${original%/*}/launch.json"
+            printf '%s  %s\n' "$expected" "$host/$original" | shasum -a 256 -c -
+          done
+          jq -es 'any(.[]; .producer == "chrono-cache" and .event == "cache.plan.prepared")' "$host"/.chrono-harness/logs/*.jsonl
           mkdir "$RUNNER_TEMP/dist"
           cp "$CARGO_TARGET_DIR/release/chrono-cache" "$RUNNER_TEMP/dist/chrono-cache-$PLATFORM"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

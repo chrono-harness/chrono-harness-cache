@@ -151,7 +151,7 @@ mod behavior {
         assert_eq!(result["terminal"], true);
         assert_eq!(result["error"], Value::Null);
         assert_eq!(result["plan"], plan);
-        let state = chrono_harness::retained_artifacts::retention::Inventory::adopted(root.path())
+        let state = crate::cache_host::mock_inventory::Inventory::adopted(root.path())
             .unwrap()
             .unwrap();
         let relative = attempt.strip_prefix(root.path()).unwrap().to_str().unwrap();
@@ -178,15 +178,14 @@ mod behavior {
                     )
                     .unwrap()
             );
-            let process: chrono_harness::ProcessResult = serde_json::from_slice(&raw).unwrap();
-            assert_eq!(process.exit_code, 0);
-            assert!(process.failure.is_none());
-            assert!(process.owned_work_joined);
-            chrono_harness::validate_launch_evidence(
-                &root.path().join(original).with_file_name("launch.json"),
-                &process,
-            )
-            .unwrap();
+            let process: Value = serde_json::from_slice(&raw).unwrap();
+            assert_eq!(process["exit_code"], 0);
+            assert!(process["failure"].is_null());
+            assert_eq!(process["owned_work_joined"], true);
+            let launch = value(&root.path().join(original).with_file_name("launch.json"));
+            for field in ["child_pid", "launcher_pid", "executable", "sha256"] {
+                assert_eq!(launch[field], process[field], "{field}");
+            }
         }
         assert_eq!(originals, 7);
         let replay = invoke(root.path(), output);
@@ -237,7 +236,7 @@ mod behavior {
         assert_eq!(process["exit_code"], 7);
         assert_eq!(process["stderr"], "original probe failure\n");
         assert_eq!(process["owned_work_joined"], true);
-        let state = chrono_harness::retained_artifacts::retention::Inventory::adopted(root.path())
+        let state = crate::cache_host::mock_inventory::Inventory::adopted(root.path())
             .unwrap()
             .unwrap();
         let intent = value(&attempt.join("intent.json"));
@@ -409,10 +408,9 @@ mod behavior {
         let intent = value(&attempt.join("intent.json"));
         let role = intent["consumer_role"].as_str().unwrap();
         let relative = attempt.strip_prefix(root.path()).unwrap().to_str().unwrap();
-        let inventory =
-            chrono_harness::retained_artifacts::retention::Inventory::adopted(root.path())
-                .unwrap()
-                .unwrap();
+        let inventory = crate::cache_host::mock_inventory::Inventory::adopted(root.path())
+            .unwrap()
+            .unwrap();
         // Model the exact interruption boundary: the actual sealed failure
         // exists, but its existing plan-root release has not completed. Never
         // fabricate a terminal result or execute another probe to recover it.
@@ -467,10 +465,9 @@ mod behavior {
         let replay = invoke(root.path(), output);
         assert!(!replay.status.success());
         assert!(String::from_utf8_lossy(&replay.stderr).contains("unknown"));
-        let inventory =
-            chrono_harness::retained_artifacts::retention::Inventory::adopted(root.path())
-                .unwrap()
-                .unwrap();
+        let inventory = crate::cache_host::mock_inventory::Inventory::adopted(root.path())
+            .unwrap()
+            .unwrap();
         inventory.maintain_at(u64::MAX).unwrap();
         assert!(attempt.join("compiler/process.json.writing").is_file());
     }
@@ -519,7 +516,7 @@ mod behavior {
     }
 
     #[cfg(unix)]
-    struct Owner(Option<std::thread::JoinHandle<Result<chrono_harness::ProcessResult, String>>>);
+    struct Owner(Option<std::thread::JoinHandle<std::io::Result<std::process::Output>>>);
     #[cfg(unix)]
     impl Drop for Owner {
         fn drop(&mut self) {
@@ -530,7 +527,7 @@ mod behavior {
     }
     #[cfg(unix)]
     impl Owner {
-        fn join(mut self) -> chrono_harness::ProcessResult {
+        fn join(mut self) -> std::process::Output {
             self.0.take().unwrap().join().unwrap().unwrap()
         }
     }
@@ -685,22 +682,19 @@ mod behavior {
         let notify_socket = socket.clone();
         let began = std::time::Instant::now();
         let mut stages = Vec::new();
+        use std::os::unix::process::ExitStatusExt;
+        let child = Command::new(env!("CARGO_BIN_EXE_chrono-cache-test-cli"))
+            .current_dir(&actual_root)
+            .env_clear()
+            .args(&args)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let business_pid = child.id();
         let owner = Owner(Some(std::thread::spawn(move || {
-            let command = chrono_harness::CommandSpec {
-                program: env!("CARGO_BIN_EXE_chrono-cache-test-cli").into(),
-                args,
-                env: Default::default(),
-                timeout_seconds: 10,
-                output_limit_bytes: 65536,
-            };
-            let result = chrono_harness::run_process_observed(
-                &actual_root,
-                &command,
-                &[],
-                &chrono_harness::file_identity(Path::new(&command.program))
-                    .unwrap()
-                    .0,
-            );
+            let result = child.wait_with_output();
             // Use the same native channel for early completion. Its bounded
             // notification cannot block while the caller joins the original.
             if let Ok(mut terminal) = UnixStream::connect(notify_socket) {
@@ -730,16 +724,14 @@ mod behavior {
         stages.push(("originals acquired", began.elapsed()));
         while_live(root.path(), &mut config, output);
         stages.push(("while_live returned", began.elapsed()));
-        let inventory =
-            chrono_harness::retained_artifacts::retention::Inventory::adopted(root.path())
-                .unwrap()
-                .unwrap();
+        let inventory = crate::cache_host::mock_inventory::Inventory::adopted(root.path())
+            .unwrap()
+            .unwrap();
         stages.push(("maintenance adopted", began.elapsed()));
         let maintenance = inventory.maintain_at(u64::MAX).unwrap();
         stages.push(("maintenance returned", began.elapsed()));
         assert!(attempt.join("compiler/stdout").is_file());
-        let signalled =
-            unsafe { libc::kill(launch["launcher_pid"].as_u64().unwrap() as _, libc::SIGKILL) };
+        let signalled = unsafe { libc::kill(business_pid as _, libc::SIGKILL) };
         let signal_error = (signalled != 0).then(std::io::Error::last_os_error);
         let released = connection.write_all(b"x");
         let result = owner.join();
@@ -748,11 +740,11 @@ mod behavior {
             "live interruption stages (wall elapsed from original dispatch): {stages:?}; \
              maintenance: {maintenance}; signal: {signal_error:?}; release: {released:?}; \
              original exit: {}, signal: {:?}, failure: {:?}; stdout: {}; stderr: {}",
-            result.exit_code,
-            result.exit_signal,
-            result.failure,
-            String::from_utf8_lossy(&result.stdout_bytes),
-            String::from_utf8_lossy(&result.stderr_bytes),
+            result.status.code().unwrap_or(-1),
+            result.status.signal(),
+            result.status.code(),
+            String::from_utf8_lossy(&result.stdout),
+            String::from_utf8_lossy(&result.stderr),
         );
         let mut logs = fs::read_dir(root.path().join(".chrono-harness/state/cache-stage-logs"))
             .unwrap()
@@ -767,12 +759,15 @@ mod behavior {
             );
         }
         assert_eq!(
-            signalled, 0,
+            signalled,
+            0,
             "signal: {signal_error:?}; original exit: {}, signal: {:?}, failure: {:?}",
-            result.exit_code, result.exit_signal, result.failure
+            result.status.code().unwrap_or(-1),
+            result.status.signal(),
+            result.status.code()
         );
         released.unwrap();
-        assert_eq!(result.exit_signal, Some(libc::SIGKILL));
+        assert_eq!(result.status.signal(), Some(libc::SIGKILL));
         assert!(!attempt.join("result.json").exists());
         let after = invoke(root.path(), output);
         assert!(!after.status.success());
@@ -878,10 +873,9 @@ mod behavior {
             "{}",
             String::from_utf8_lossy(&completed.stderr)
         );
-        let inventory =
-            chrono_harness::retained_artifacts::retention::Inventory::adopted(root.path())
-                .unwrap()
-                .unwrap();
+        let inventory = crate::cache_host::mock_inventory::Inventory::adopted(root.path())
+            .unwrap()
+            .unwrap();
         let role = format!("cache-plan:{:x}", Sha256::digest(attempt.as_bytes()));
         assert!(
             inventory
@@ -893,134 +887,5 @@ mod behavior {
         inventory.maintain_at(u64::MAX).unwrap();
         assert!(root.path().join(attempt).is_dir());
         assert_eq!(fs::read(count).unwrap(), b"x");
-    }
-
-    #[test]
-    fn owned_process_evidence_reserves_each_original_once_before_dispatch() {
-        use chrono_harness::retained_artifacts::retention::Inventory;
-        for outside_launch in [false, true] {
-            let (root, _) = fixture();
-            let policy_path = root.path().join(".chrono-harness/retention.json");
-            let mut policy = value(&policy_path);
-            // One directory and exactly three originals fit. A second charge
-            // for either a stream or the launch must fail this boundary.
-            policy["max_manifest_nodes"] = json!(4);
-            for limits in policy["terminal_limits"]
-                .as_object_mut()
-                .unwrap()
-                .values_mut()
-            {
-                limits["max_count"] = json!(4);
-            }
-            fs::write(&policy_path, serde_json::to_vec(&policy).unwrap()).unwrap();
-            let output = ".chrono-harness/state/cache-probes/owned-originals";
-            let state = Inventory::adopted(root.path()).unwrap().unwrap();
-            fs::create_dir_all(root.path().join(".chrono-harness/state/cache-probes")).unwrap();
-            let publication = state
-                .plan_rooted(
-                    "cache-probe-attempt",
-                    output,
-                    json!({"completion":"not-established"}),
-                    "fixture-original",
-                )
-                .unwrap();
-            publication.materialize().unwrap();
-            let directory = root.path().join(output);
-            let launch = if outside_launch {
-                root.path().join("outside-launch.json")
-            } else {
-                directory.join("launch.json")
-            };
-            let count = root.path().join("invocations");
-            let command = chrono_harness::CommandSpec {
-                program: env!("CARGO_BIN_EXE_chrono-cache-test-probe").into(),
-                args: vec!["count".into(), count.to_str().unwrap().into()],
-                env: Default::default(),
-                timeout_seconds: 5,
-                output_limit_bytes: 4096,
-            };
-            let result = chrono_harness::run_process_observed_retained(
-                root.path(),
-                &command,
-                &[],
-                &chrono_harness::file_identity(Path::new(&command.program))
-                    .unwrap()
-                    .0,
-                &chrono_harness::ProcessEvidence {
-                    root: root.path(),
-                    stdout: &directory.join("stdout"),
-                    stderr: &directory.join("stderr"),
-                    launch: &launch,
-                    publication: Some(&publication),
-                },
-            );
-            if outside_launch {
-                let error = result.unwrap_err();
-                assert!(error.contains("outside exact output"), "{error}");
-                assert!(!count.exists());
-                assert!(!launch.exists());
-            } else {
-                let process = result.unwrap();
-                assert_eq!(process.exit_code, 0);
-                assert!(process.failure.is_none(), "{process:?}");
-                assert!(process.owned_work_joined);
-                assert_eq!(fs::read(&count).unwrap(), b"x");
-                assert_eq!(
-                    fs::read(directory.join("stdout")).unwrap(),
-                    b"stable compiler\n"
-                );
-                assert_eq!(fs::read(directory.join("stderr")).unwrap(), b"");
-                chrono_harness::validate_launch_evidence(&launch, &process).unwrap();
-                publication
-                    .complete_sealed(json!({"exit_code":process.exit_code}))
-                    .unwrap();
-            }
-        }
-    }
-
-    #[test]
-    fn owned_process_evidence_rejects_outside_files_before_dispatch() {
-        use chrono_harness::retained_artifacts::retention::Inventory;
-        let (root, _) = fixture();
-        let output = ".chrono-harness/state/cache-probes/capability";
-        let state = Inventory::adopted(root.path()).unwrap().unwrap();
-        fs::create_dir_all(root.path().join(".chrono-harness/state/cache-probes")).unwrap();
-        let publication = state
-            .plan_rooted(
-                "cache-probe-attempt",
-                output,
-                json!({"completion":"not-established"}),
-                "fixture-original",
-            )
-            .unwrap();
-        publication.materialize().unwrap();
-        let count = root.path().join("invocations");
-        let command = chrono_harness::CommandSpec {
-            program: env!("CARGO_BIN_EXE_chrono-cache-test-probe").into(),
-            args: vec!["count".into(), count.to_str().unwrap().into()],
-            env: Default::default(),
-            timeout_seconds: 5,
-            output_limit_bytes: 4096,
-        };
-        let directory = root.path().join(output);
-        let error = chrono_harness::run_process_observed_retained(
-            root.path(),
-            &command,
-            &[],
-            &chrono_harness::file_identity(Path::new(&command.program))
-                .unwrap()
-                .0,
-            &chrono_harness::ProcessEvidence {
-                root: root.path(),
-                stdout: &root.path().join("outside"),
-                stderr: &directory.join("stderr"),
-                launch: &directory.join("launch.json"),
-                publication: Some(&publication),
-            },
-        )
-        .unwrap_err();
-        assert!(error.contains("outside exact output"), "{error}");
-        assert!(!count.exists());
-        assert!(!root.path().join("outside").exists());
     }
 }

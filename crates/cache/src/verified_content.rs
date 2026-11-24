@@ -1,7 +1,7 @@
 //! Cache artifact observations, complete missing lists and publication selection.
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
 use std::collections::BTreeMap;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 

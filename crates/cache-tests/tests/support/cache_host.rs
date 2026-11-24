@@ -1,3 +1,5 @@
+#[path = "mock_inventory.rs"]
+pub mod mock_inventory;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{fs, path::Path, process::Command};

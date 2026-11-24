@@ -1,7 +1,5 @@
-use chrono_harness::{
-    CommandSpec, ProcessEvidence, file_identity, resolve_program, run_process_observed_retained,
-    sha256, validate_launch_evidence,
-};
+use crate::retention::CommandSpec;
+use crate::{file_identity, sha256};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fs, path::Path};
@@ -45,11 +43,7 @@ pub fn observe(
                 Err(e) => return Err(format!("environment {name}: {e}")),
             }
         }
-        let executable = resolve_program(
-            root,
-            &command.program,
-            Some(command.env.get("PATH").map(String::as_str).unwrap_or("")),
-        )?;
+        let executable = command.program(root)?;
         let (executable_sha256, _) = file_identity(&executable)?;
         command.program = executable
             .to_str()
@@ -61,19 +55,9 @@ pub fn observe(
         )?;
         invoked = true;
         attempt.unknown.set(true);
-        run_process_observed_retained(
-            root,
-            &command,
-            &[],
-            &executable_sha256,
-            &ProcessEvidence {
-                root,
-                stdout: &directory.join("stdout"),
-                stderr: &directory.join("stderr"),
-                launch: &directory.join("launch.json"),
-                publication: Some(&attempt.publication),
-            },
-        )
+        attempt
+            .publication
+            .execute(input_id, &command, &executable_sha256)
     })();
     let process = match evaluated {
         Ok(process) => process,
@@ -97,11 +81,31 @@ pub fn observe(
         }
     };
     // Publish the actual receipt before evaluating launch, exit or file-path semantics.
-    let process_value = serde_json::to_value(&process).map_err(|e| e.to_string())?;
-    let original_raw = serde_json::to_vec(&process_value).map_err(|e| e.to_string())?;
+    #[derive(Deserialize)]
+    struct Process {
+        exit_code: i32,
+        exit_signal: Option<i32>,
+        owned_work_joined: bool,
+        failure: Option<String>,
+        environment: BTreeMap<String, String>,
+        executable: std::path::PathBuf,
+        sha256: String,
+        argv: Vec<String>,
+        stdout_sha256: String,
+        stdout_bytes: Vec<u8>,
+        stderr_sha256: String,
+        stderr_bytes: Vec<u8>,
+    }
+    let process_value = process;
+    let process: Process =
+        serde_json::from_value(process_value.clone()).map_err(|e| e.to_string())?;
     attempt.record(&directory.join("process.json"), &process_value).map_err(|e|
         format!("E_CACHE_PROBE: original receipt publication: {e}; attempt {}; observed exit {} signal {:?}; original {original}", attempt.publication.id(), process.exit_code, process.exit_signal))?;
-    let launch = validate_launch_evidence(&directory.join("launch.json"), &process);
+    let (original_digest, _) = file_identity(&directory.join("process.json"))?;
+    let launch = attempt
+        .publication
+        .session
+        .launch(Path::new(&original), &original_digest);
     let terminal = super::verified_planner::confirmed_probe(
         launch.is_ok(),
         process.exit_code,
@@ -153,6 +157,6 @@ pub fn observe(
     }
     Ok((
         observed,
-        json!({"path":original,"sha256":sha256(&original_raw),"attempt_id":attempt.publication.id()}),
+        json!({"path":original,"sha256":original_digest,"attempt_id":attempt.publication.id()}),
     ))
 }
