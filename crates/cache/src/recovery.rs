@@ -1883,7 +1883,7 @@ pub(crate) fn dispatch(args: &[String]) -> Result<String, String> {
         super::retain_original(&root, &directory, "restore-steps", steps_raw.as_bytes())?;
     let mut report = json!({"schema":"chrono-cache-recovery/v1","plan":binding,"native_steps":steps_original,
         "status":RecoverySummary::new().status(false),"caches":{},"error":null,
-        "limits":["isolated provider restore phase, before producers", "registered native observations only; no archive integrity or build verdict", "missing matched keys do not distinguish miss from backend or extraction failure", "linked worktree recovery unsupported"]});
+        "limits":["isolated provider restore phase, before producers", "restore classification uses provider observations, configured producer manifests check restored contents, and the native command determines build and test outcomes", "missing matched keys do not distinguish miss from backend or extraction failure", "linked worktree recovery unsupported"]});
     let result = (|| -> Result<(), String> {
         let config: super::Config =
             decode(&fs::read(no_symlink_parents(&root, config_path)?).map_err(|e| e.to_string())?)?;
