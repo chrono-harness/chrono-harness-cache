@@ -18,7 +18,7 @@ jobs:
         with:
           version: 2026.11.12
           cache: false
-          install_args: http:chrono-ci http:chrono-cache http:chrono-harness http:verus
+          install_args: http:chrono-ci http:chrono-cache http:chrono-harness http:chrono-host-bootstrap http:verus
       - name: Verify cache registration and select the installed tools
         run: |
           "$(mise which chrono-ci)" verify --host-root . --config .chrono-harness/ci/check.json
