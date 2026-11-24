@@ -24,6 +24,20 @@ jobs:
           "$(mise which chrono-ci)" verify --host-root . --config .chrono-harness/ci/check.json
           .chrono-harness/ci/prepare-cargo
           printf 'VERUS=%s\n' "$(mise which verus)" >> "$GITHUB_ENV"
+      - name: Exercise unavailable cache transport in this runner
+        shell: bash
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          action = Path(".github/actions/native-check/action.yml")
+          data = action.read_text()
+          mark = "        uses: actions/cache/restore@"
+          assert data.count(mark) == 2
+          # Intercept only outbound connections from the two native restore actions.
+          # The refused loopback proxy cannot receive any credentials or workspace bytes.
+          proxy = "        env:\n          HTTPS_PROXY: http://127.0.0.1:0\n          HTTP_PROXY: http://127.0.0.1:0\n          NO_PROXY: ''\n"
+          action.write_text(data.replace(mark, proxy + mark))
+          PYTHON
       - uses: ./.github/actions/native-check
       - name: Run native tests and Verus proofs
         run: ./check.sh verify
