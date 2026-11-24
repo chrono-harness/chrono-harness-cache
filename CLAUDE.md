@@ -8,7 +8,7 @@
 
 ## 本仓开发
 
-产品位于 [`crates/cache`](crates/cache)。原生测试位于 [`crates/cache-tests`](crates/cache-tests)。在仓库根目录运行 `mise exec -- ./check.sh` 执行本仓的检查。
+产品位于 [`crates/cache`](crates/cache)。原生测试位于 [`crates/cache-tests`](crates/cache-tests)。在仓库根目录运行 `mise exec -- ./check.sh` 执行本仓的检查。 入口按 Git 变更选择本仓的证明和原生消费者。GitHub 的 Ubuntu 单元保存逐项原件，macOS 作业按实际 SDK 与编译配置恢复和封存 Cargo 缓存。
 
 日常开发和 PR 使用 `dev`，正式版本从 `main` 发布。
 

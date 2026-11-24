@@ -1,0 +1,121 @@
+# chrono-ci: owned github-job-gating/v1
+name: "Cache / scoped"
+on:
+  push:
+    branches: ["dev","main"]
+  pull_request:
+    branches: ["dev","main"]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: "chrono-ci:.github/workflows/scoped.yml:${{ github.event_name }}:${{ github.event.pull_request.number || github.run_id }}"
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  detect:
+    name: Detect registered DELTA
+    runs-on: "macos-15"
+    timeout-minutes: 45
+    outputs:
+      detection: ${{ steps.detect.outputs.detection }}
+      unit_cache: ${{ steps.detect.outputs.unit_cache }}
+    steps:
+      - name: Acquire declared detector source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .chrono-harness/
+            .github/workflows/scoped.yml
+            .config/mise/conf.d/
+          persist-credentials: true
+      - name: Bootstrap registered detector tools
+        shell: bash
+        run: |
+          '/bin/sh' '.chrono-harness/ci/install.sh'
+      - name: Detect required units from fixed Git endpoints
+        id: detect
+        shell: bash
+        env:
+          CHRONO_WORKFLOW_REVISION: ${{ github.workflow_sha }}
+        run: |
+          '.chrono-harness/bin/chrono-ci' detect --host-root . --config '.chrono-harness/ci/units.json' --github-output "$GITHUB_OUTPUT"
+  unit_cache:
+    outputs:
+      production: ${{ steps.production.outputs.production }}
+    name: "Cache / proofs and consumers"
+    needs: detect
+    if: ${{ needs.detect.outputs.unit_cache == 'true' }}
+    runs-on: "ubuntu-24.04"
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          filter: blob:none
+          persist-credentials: true
+      - name: Bootstrap registered tools
+        shell: bash
+        run: |
+          '/bin/sh' '.chrono-harness/ci/install.sh'
+      - name: Canonical harness check
+        shell: bash
+        env:
+          CHRONO_CHECK_SOURCE: ci
+          CHRONO_CI_DETECTION: ${{ needs.detect.outputs.detection }}
+          CHRONO_WORKFLOW_REVISION: ${{ github.workflow_sha }}
+        run: |
+          '.chrono-harness/bin/chrono-harness' 'check' '--unit' 'cache'
+      - name: Bind original unit artifact production
+        id: production
+        shell: bash
+        run: |
+          '.chrono-harness/bin/chrono-ci' production --host-root . --config '.chrono-harness/ci/units.json' --unit 'cache' --github-output "$GITHUB_OUTPUT"
+      - name: Preserve actual check evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: chrono-unit-cache-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ".chrono-harness/state/cache-check/"
+          if-no-files-found: error
+          retention-days: 1
+  aggregate:
+    name: "Cache / scoped"
+    needs: ["detect","unit_cache"]
+    if: ${{ always() }}
+    runs-on: "macos-15"
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          filter: blob:none
+          persist-credentials: true
+      - name: Bootstrap registered tools
+        shell: bash
+        run: |
+          '/bin/sh' '.chrono-harness/ci/install.sh'
+      - name: Canonical harness check
+        shell: bash
+        env:
+          CHRONO_CHECK_SOURCE: ci
+          CHRONO_CI_DETECTION: ${{ needs.detect.outputs.detection }}
+          CHRONO_CI_NEEDS: ${{ toJSON(needs) }}
+          CHRONO_WORKFLOW_REVISION: ${{ github.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          '.chrono-harness/bin/chrono-harness' 'check' '--collect'
+      - name: Preserve actual check evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: chrono-collection-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ".chrono-harness/state/collection/"
+          if-no-files-found: error
