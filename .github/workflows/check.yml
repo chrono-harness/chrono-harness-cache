@@ -25,6 +25,8 @@ jobs:
           .chrono-harness/ci/prepare-cargo
           printf 'VERUS=%s\n' "$(mise which verus)" >> "$GITHUB_ENV"
       - uses: ./.github/actions/native-check
+      - name: Run native tests and Verus proofs
+        run: ./check.sh verify
       - name: Preserve failing native check originals
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
+phase=${1:-all}
+case "$phase" in
+  all|build|verify) ;;
+  *) echo "usage: ./check.sh [build|verify]" >&2; exit 2 ;;
+esac
+if [[ $# -gt 1 || ( "$phase" != all && -z "${CARGO_TARGET_DIR:-}" ) ]]; then
+  echo "split native checks need a caller-owned CARGO_TARGET_DIR and a single phase" >&2
+  exit 2
+fi
 mkdir -p target
 scratch=$(mktemp -d "$(pwd -P)/target/check.XXXXXXXX")
 trap 'rm -rf -- "$scratch"' EXIT
@@ -8,16 +17,19 @@ export TMPDIR="$scratch"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$scratch/cargo}"
 mkdir -p "$CARGO_TARGET_DIR"
 CARGO_TARGET_DIR=$(cd "$CARGO_TARGET_DIR" && pwd -P)
-cargo fmt --check --manifest-path crates/cache/Cargo.toml
-cargo fmt --check --manifest-path crates/cache-tests/Cargo.toml
-cargo build --locked --manifest-path crates/cache/Cargo.toml
-cargo build --locked --manifest-path crates/cache-tests/Cargo.toml --bin chrono-cache-mock-owner
-for program in chrono-harness chrono-diagnostics; do
-  binding="$CARGO_TARGET_DIR/debug/$program"
-  if [[ "$(readlink "$binding" || true)" != chrono-cache-mock-owner ]]; then
-    ln -s chrono-cache-mock-owner "$binding"
-  fi
-done
+if [[ "$phase" != verify ]]; then
+  cargo fmt --check --manifest-path crates/cache/Cargo.toml
+  cargo fmt --check --manifest-path crates/cache-tests/Cargo.toml
+  cargo build --locked --manifest-path crates/cache/Cargo.toml
+  cargo test --no-run --locked --manifest-path crates/cache-tests/Cargo.toml
+  for program in chrono-harness chrono-diagnostics; do
+    binding="$CARGO_TARGET_DIR/debug/$program"
+    if [[ "$(readlink "$binding" || true)" != chrono-cache-mock-owner ]]; then
+      ln -s chrono-cache-mock-owner "$binding"
+    fi
+  done
+  if [[ "$phase" == build ]]; then exit 0; fi
+fi
 PATH="$CARGO_TARGET_DIR/debug:$PATH" cargo test --locked --manifest-path crates/cache-tests/Cargo.toml -- --test-threads=2
 
 prove() {
