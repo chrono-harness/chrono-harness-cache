@@ -2,8 +2,24 @@ name: check
 on:
   pull_request:
     branches: [dev, main]
+    paths-ignore:
+      - 'README.md'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'docs/**'
+      - '.chrono-harness/USAGE.md'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
   push:
     branches: [dev, main]
+    paths-ignore:
+      - 'README.md'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'docs/**'
+      - '.chrono-harness/USAGE.md'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
 permissions:
   contents: read
 jobs:

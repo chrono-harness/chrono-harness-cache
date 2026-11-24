@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
-phase=${1:-all}
+if [[ $# -eq 0 ]]; then
+  /bin/sh .chrono-harness/ci/install.sh
+  export PATH="$PWD/.chrono-harness/bin:$PATH"
+  export CHRONO_CHECK_SOURCE=${CHRONO_CHECK_SOURCE:-local}
+  exec .chrono-harness/bin/chrono-harness check
+fi
+phase=$1
 case "$phase" in
-  all|build|verify) ;;
-  *) echo "usage: ./check.sh [build|verify]" >&2; exit 2 ;;
+  --native|build|verify) ;;
+  *) echo "usage: ./check.sh [--native|build|verify]" >&2; exit 2 ;;
 esac
-if [[ $# -gt 1 || ( "$phase" != all && -z "${CARGO_TARGET_DIR:-}" ) ]]; then
+if [[ $# -gt 1 || ( "$phase" != --native && -z "${CARGO_TARGET_DIR:-}" ) ]]; then
   echo "split native checks need a caller-owned CARGO_TARGET_DIR and a single phase" >&2
   exit 2
 fi
@@ -67,6 +73,9 @@ chrono-host-bootstrap check-compiler-sources native "$stem" src/verified_planner
   src/recovery.rs src/content.rs src/probe.rs \
   src/lib.rs ||
   coverage_failure "native library differs from required sources"
+
+# The scoped runner executes both declared proof roots as separate operations.
+if [[ "$phase" == --native ]]; then exit 0; fi
 
 src=crates/cache/src
 tests=crates/cache-tests/tests

@@ -171,7 +171,16 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:cache-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".chrono-harness/rules.json",
@@ -300,6 +309,18 @@
       "surface": "product",
       "cost": "unmeasured",
       "edges": []
+    },
+    {
+      "path": ".github/workflows/scoped.yml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:cache-tests"
+        }
+      ]
     },
     {
       "path": ".gitignore",
