@@ -5,13 +5,18 @@ mkdir -p target
 scratch=$(mktemp -d "$(pwd -P)/target/check.XXXXXXXX")
 trap 'rm -rf -- "$scratch"' EXIT
 export TMPDIR="$scratch"
-export CARGO_TARGET_DIR="$scratch/cargo"
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$scratch/cargo}"
+mkdir -p "$CARGO_TARGET_DIR"
+CARGO_TARGET_DIR=$(cd "$CARGO_TARGET_DIR" && pwd -P)
 cargo fmt --check --manifest-path crates/cache/Cargo.toml
 cargo fmt --check --manifest-path crates/cache-tests/Cargo.toml
 cargo build --locked --manifest-path crates/cache/Cargo.toml
 cargo build --locked --manifest-path crates/cache-tests/Cargo.toml --bin chrono-cache-mock-owner
 for program in chrono-harness chrono-diagnostics; do
-  ln -s "$CARGO_TARGET_DIR/debug/chrono-cache-mock-owner" "$CARGO_TARGET_DIR/debug/$program"
+  binding="$CARGO_TARGET_DIR/debug/$program"
+  if [[ "$(readlink "$binding" || true)" != chrono-cache-mock-owner ]]; then
+    ln -s chrono-cache-mock-owner "$binding"
+  fi
 done
 PATH="$CARGO_TARGET_DIR/debug:$PATH" cargo test --locked --manifest-path crates/cache-tests/Cargo.toml -- --test-threads=2
 
