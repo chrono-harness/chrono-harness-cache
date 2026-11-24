@@ -1,0 +1,86 @@
+{
+  "schema_version": 2,
+  "status": "active",
+  "owners": [
+    "host",
+    "cache",
+    "cache-tests"
+  ],
+  "projects": [
+    {
+      "id": "cache",
+      "kind": "production",
+      "manifest": "crates/cache/Cargo.toml",
+      "lockfile": "crates/cache/Cargo.lock",
+      "root": "crates/cache",
+      "test_project": "cache-tests",
+      "actions": {
+        "verify_planner": {
+          "operation": "verify.cache-planner",
+          "tool": "verus",
+          "argv": [
+            "--crate-type=lib",
+            "--no-cheating",
+            "--no-external-by-default",
+            "--num-threads",
+            "2",
+            "--output-json",
+            "--compile",
+            "--emit=link=.chrono-harness/state/verify.cache-planner.rlib,dep-info=.chrono-harness/state/verify.cache-planner.rlib.d",
+            "crates/cache/src/verified_planner.rs",
+            "-o",
+            ".chrono-harness/state/verify.cache-planner.rlib",
+            "-Zchecksum-hash-algorithm=sha256"
+          ],
+          "output_contract": {
+            "version": "0.2026.04.24.f8e1704",
+            "commit": "f8e17045c4ac17a02e566b8997070f2eecc255be"
+          }
+        }
+      },
+      "language": "rust"
+    },
+    {
+      "id": "cache-tests",
+      "kind": "test",
+      "manifest": "crates/cache-tests/Cargo.toml",
+      "lockfile": "crates/cache-tests/Cargo.lock",
+      "root": "crates/cache-tests",
+      "tests_for": "cache",
+      "actions": {
+        "verify_planner": {
+          "operation": "verify.cache-planner-tests",
+          "tool": "verus",
+          "argv": [
+            "--crate-type=lib",
+            "--no-cheating",
+            "--no-external-by-default",
+            "--num-threads",
+            "2",
+            "--output-json",
+            "--compile",
+            "--emit=link=.chrono-harness/state/verify.cache-planner-tests.rlib,dep-info=.chrono-harness/state/verify.cache-planner-tests.rlib.d",
+            "crates/cache-tests/tests/verified_planner.rs",
+            "-o",
+            ".chrono-harness/state/verify.cache-planner-tests.rlib",
+            "-Zchecksum-hash-algorithm=sha256"
+          ],
+          "output_contract": {
+            "version": "0.2026.04.24.f8e1704",
+            "commit": "f8e17045c4ac17a02e566b8997070f2eecc255be"
+          }
+        },
+        "execute": {
+          "operation": "cache.owner-check",
+          "tool": "bash",
+          "argv": [
+            "./check.sh",
+            "--native"
+          ]
+        }
+      },
+      "language": "rust"
+    }
+  ],
+  "scripts": []
+}
