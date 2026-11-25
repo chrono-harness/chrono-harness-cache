@@ -7,6 +7,18 @@ use std::{collections::BTreeMap, fs, path::Path, time::Instant};
 pub(crate) const MARKER: &str = ".chrono-cache-content-v1.json";
 pub(crate) const METHOD: &str = "producer-manifest/v1";
 
+fn content_manifest(
+    cache: &str,
+    producer: &Value,
+    key: impl serde::Serialize,
+    artifact_id: &str,
+    artifact: &Value,
+    files: &Value,
+) -> Value {
+    json!({"schema":METHOD,"cache":cache,"producer":producer,"key":key,
+        "artifact_id":artifact_id,"artifact":artifact,"files":files})
+}
+
 fn inventory(root: &Path) -> Result<Value, String> {
     fn visit(
         root: &Path,
@@ -116,7 +128,7 @@ pub(crate) fn verify(
         };
         let mut row =
             json!({"observed":observed.as_ref().ok(),"observation_error":observed.as_ref().err()});
-        let matches = match raw {
+        let decoded = match raw {
             Ok(raw) => {
                 row["manifest_original"] = json!(super::retain_original(
                     root,
@@ -124,25 +136,29 @@ pub(crate) fn verify(
                     "content-manifest",
                     &raw
                 )?);
-                match decode::<Value>(&raw) {
-                    Ok(expected) => {
-                        expected
-                            == json!({"schema":METHOD,"cache":id,"producer":cache["producer"],"key":matched,
-                            "artifact_id":artifact_id,"artifact":artifact,"files":observed.as_ref().ok()})
-                            && observed.is_ok()
-                    }
-                    Err(error) => {
-                        row["manifest_error"] = json!(error);
-                        false
-                    }
-                }
+                decode::<Value>(&raw)
             }
-            Err(error) => {
-                row["manifest_error"] = json!(error);
-                false
-            }
+            Err(error) => Err(error),
         };
-        valid &= matches;
+        if let Err(error) = &decoded {
+            row["manifest_error"] = json!(error);
+        }
+        let matches = super::verified_planner::content_preflight::observe_manifest(
+            &mut valid,
+            observed.as_ref().ok(),
+            decoded.as_ref().ok(),
+            |files, marker| {
+                *marker
+                    == content_manifest(
+                        id,
+                        &cache["producer"],
+                        matched,
+                        artifact_id,
+                        artifact,
+                        files,
+                    )
+            },
+        );
         row["status"] = json!(if matches { "matched" } else { "unusable" });
         observations.insert(artifact_id, row);
     }
@@ -310,7 +326,14 @@ pub(crate) fn dispatch(args: &[String]) -> Result<String, String> {
                             let target = super::path(&root, relative)?;
                             let files = inventory(&target)
                                 .map_err(|e| format!("E_CACHE_CONTENT: {relative}: {e}"))?;
-                            let manifest = json!({"schema":METHOD,"cache":id,"producer":cache["producer"],"key":cache["key"],"artifact_id":artifact_id,"artifact":artifact,"files":files});
+                            let manifest = content_manifest(
+                                id,
+                                &cache["producer"],
+                                &cache["key"],
+                                artifact_id,
+                                artifact,
+                                &files,
+                            );
                             let raw = serde_json::to_vec(&manifest).map_err(|e| e.to_string())?;
                             // Publication validates marker and parent links; a failed seal never authorizes save.
                             let marker = crate::files::prepare_publication(

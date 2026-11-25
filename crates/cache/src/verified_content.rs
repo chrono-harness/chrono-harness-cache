@@ -7,6 +7,26 @@ use vstd::prelude::*;
 
 verus! {
 
+/// A missing inventory or marker is unusable, and a later match cannot repair an earlier row.
+pub fn observe_manifest<A, M, F>(all_matched: &mut bool, observed: Option<A>,
+    marker: Option<M>, equal: F) -> (matched: bool)
+    where F: FnOnce(A, M) -> bool,
+    requires forall|a: A, m: M| equal.requires((a,m)),
+    ensures
+        *all_matched == (*old(all_matched) && matched),
+        match (observed, marker) {
+            (Some(a), Some(m)) => equal.ensures((a,m), matched),
+            _ => !matched,
+        },
+{
+    let matched = match (observed, marker) {
+        (Some(a), Some(m)) => equal(a, m),
+        _ => false,
+    };
+    *all_matched = *all_matched && matched;
+    matched
+}
+
 pub type ArtifactRow<'a> = (&'a str, Option<&'a str>);
 pub type MissingArtifacts<'a> = BTreeMap<&'a str, &'a str>;
 
