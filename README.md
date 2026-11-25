@@ -14,4 +14,4 @@
 
 本仓的 macOS 原生检查通过 `.chrono-harness/ci/check.json` 登记唯一保存作业。宿主安装的 `chrono-ci generate` 和 `verify` 生成、核对 `.github/actions/native-check/action.yml`。本机和 Ubuntu 的按变更检查依据 `.chrono-harness/FILEMAP.json` 选择两条 Verus 根及 Rust 消费者，汇总读取单元原件。GitHub 调用该脚本的 `build` 阶段编译产品与全部测试并封存输出，之后调用 `verify` 执行本轮测试和证明。计划按 `.chrono-harness/cache.json` 绑定本仓锁文件、清单、源文件、编译器、平台、链接器、SDK 和生效的增量设置。相同编译配置下可以恢复旧源码的 Cargo 产物，然后重跑构建、测试和证明。
 
-依赖包和索引在 `target/cargo-home/registry`，编译产物在 `target/native-cargo`，本轮检查原件在 `.chrono-harness/state/cache`，分别由恢复步骤、Cargo 和本轮诊断消费。GitHub 仓库的缓存保留上限为 7 天，每个托管 job 使用独立检出。成功作业的计划和恢复报告随本轮检出回收；失败作业把诊断原件上传至 GitHub，保留 1 天。遇到非零或校验错误，GitHub 作业日志保存本次处理结果。
+依赖包和索引在 `target/cargo-home/registry`，编译产物在 `target/native-cargo`，本轮检查原件在 `.chrono-harness/state/cache`，分别由恢复步骤、Cargo 和本轮诊断消费。宿主把本轮开始时的 UTC ISO 周（含周年）作为这两类缓存的兼容输入，精确键和恢复前缀一起按周更新。已启动作业用本轮的周值。GitHub 在最后访问超过 7 天后清理缓存；在这些入口都使用现行配置的条件下，旧周停止使用，单条缓存经历至多一个 UTC 周、跨周作业的剩余运行时间和 GitHub 的空闲回收窗口。重跑已采用本配置的提交会重新读取当时的 UTC 周。仍运行旧配置的分支、旧提交重跑以及独立读取旧键的使用方可能继续刷新旧对象。GitHub 托管作业的执行上限和服务实际回收调度共同决定最晚物理删除时间。每个托管 job 使用独立检出。成功作业的计划和恢复报告随本轮检出回收；失败作业把诊断原件上传至 GitHub，保留 1 天。遇到非零或校验错误，GitHub 作业日志保存本次处理结果。
