@@ -29,6 +29,25 @@ mod probe;
 
 verus! {
 
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn content_rows_preserve_each_result_and_every_prior_failure() {
+    let same = |a: u64, b: u64| -> (answer: bool) ensures answer == (a == b), { a == b };
+    let mut all = true;
+    let first = content::observe_manifest(&mut all, Some(2u64), Some(2u64), same);
+    if !(first && all) { panic!(); }
+    let missing = content::observe_manifest(&mut all, None, Some(2u64), same);
+    if !(!missing && !all) { panic!(); }
+    let later = content::observe_manifest(&mut all, Some(4u64), Some(4u64), same);
+    if !(later && !all) { panic!(); }
+    let mut fresh = true;
+    let absent_marker = content::observe_manifest(&mut fresh, Some(2u64), None, same);
+    if !(!absent_marker && !fresh) { panic!(); }
+    let mut changed = true;
+    let mismatch = content::observe_manifest(&mut changed, Some(2u64), Some(3u64), same);
+    if !(!mismatch && !changed) { panic!(); }
+}
+
+
 fn admitted_json_pointers_bind_every_escape(raw: &[u8], i: usize)
     requires i < raw.len(),
 {
