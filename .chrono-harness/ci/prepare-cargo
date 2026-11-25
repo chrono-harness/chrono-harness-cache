@@ -5,5 +5,3 @@ ln -s "$(mise which chrono-cache)" .chrono-harness/bin/chrono-cache
 ln -s "$(mise which chrono-harness)" .chrono-harness/bin/chrono-harness
 jq -er '"CARGO_INCREMENTAL=" + .build.incremental' .chrono-harness/ci/cargo.json >> "$GITHUB_ENV"
 printf 'CHRONO_RUSTUP=%s\n' "$(command -v rustup)" >> "$GITHUB_ENV"
-cache_week=$(date -u +%G-W%V)
-printf 'CHRONO_CACHE_WEEK=%s\n' "$cache_week" >> "$GITHUB_ENV"

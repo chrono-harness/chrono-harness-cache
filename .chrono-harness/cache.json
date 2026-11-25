@@ -322,11 +322,6 @@
       "kind": "file",
       "path": "target/cargo-home/config.toml",
       "presence": "absent"
-    },
-    "cache-week": {
-      "kind": "environment",
-      "name": "CHRONO_CACHE_WEEK",
-      "presence": "present"
     }
   },
   "artifacts": {
@@ -356,8 +351,7 @@
       ],
       "compatibility_inputs": [
         "cargo",
-        "platform",
-        "cache-week"
+        "platform"
       ],
       "source_inputs": [
         "product.lock",
@@ -401,8 +395,7 @@
         "cc",
         "ld",
         "cargo-home-config",
-        "cargo-home-config-toml",
-        "cache-week"
+        "cargo-home-config-toml"
       ],
       "source_inputs": [
         "source.crates.cache-tests.tests.continuity.rs",
