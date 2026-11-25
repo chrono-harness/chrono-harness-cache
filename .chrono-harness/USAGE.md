@@ -16,4 +16,4 @@
 
 产品位于 [`crates/cache`](../crates/cache)。原生测试位于 [`crates/cache-tests`](../crates/cache-tests)。在仓库根目录运行 `mise exec -- ./check.sh` 执行本仓的检查。 入口按 Git 变更选择本仓的证明和原生消费者。GitHub 的 Ubuntu 单元保存逐项原件，macOS 作业按实际 SDK 与编译配置恢复和封存 Cargo 缓存。
 
-原生检查入口用 `chrono-host-bootstrap native-scratch run PROGRAM [ARG ...]` 启动编译或测试。子程序从 `CHRONO_NATIVE_SCRATCH` 取得本次专用目录。成功且读者退出后即可回收；失败或中断的目录保留 86400 秒，仍持租约时继续保全。需要留存的诊断应在窗口内转存并核对摘要。 `build` 和 `verify` 共用调用者指定的 Cargo target。每小时的 `mise run harness-maintain-checks` 处理本仓原生临时目录和报告。
+原生检查入口用 `chrono-host-bootstrap native-scratch run PROGRAM [ARG ...]` 启动编译或测试。子程序从 `CHRONO_NATIVE_SCRATCH` 取得本次专用目录。成功且读者退出后即可回收；失败或中断的目录保留 86400 秒，仍持租约时继续保全。需要留存的诊断应在窗口内转存并核对摘要。 `build` 和 `verify` 共用调用者指定的 Cargo target。`mise run harness-maintain-checks` 处理本仓原生临时目录和报告。
