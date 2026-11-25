@@ -52,6 +52,114 @@ pub use recovery_source::*;
 
 verus! {
 
+/// Rust paths on the supported Unix hosts admit internal empty and dot components.
+pub open spec fn invalid_relative_byte(raw: Seq<u8>, i: int) -> bool
+    recommends 0 <= i < raw.len(),
+{
+    raw[i] == 0 || raw[i] == 10 || raw[i] == 13 || raw[i] == 92
+    || (raw[i] == 46 && (i == 0 || raw[i - 1] == 47)
+        && i + 1 < raw.len() && raw[i + 1] == 46
+        && (i + 2 == raw.len() || raw[i + 2] == 47))
+}
+
+pub open spec fn host_relative(raw: Seq<u8>) -> bool {
+    raw.len() > 0 && raw[0] != 47
+    && !(raw[0] == 46 && (raw.len() == 1 || raw[1] == 47))
+    && forall|i:int| 0 <= i < raw.len() ==> !invalid_relative_byte(raw, i)
+}
+
+pub fn accepts_relative(raw: &[u8]) -> (accepted: bool)
+    ensures accepted == host_relative(raw@),
+{
+    if raw.len() == 0 || raw[0] == 47
+        || (raw[0] == 46 && (raw.len() == 1 || raw[1] == 47))
+    { return false; }
+
+    let mut i = 0;
+    while i < raw.len()
+        invariant i <= raw.len(),
+            forall|j:int| 0 <= j < i ==> !invalid_relative_byte(raw@, j),
+        decreases raw.len() - i,
+    {
+        let byte = raw[i];
+        if byte == 0 || byte == 10 || byte == 13 || byte == 92
+            || (byte == 46 && (i == 0 || raw[i-1] == 47)
+                && raw.len() - i >= 2 && raw[i+1] == 46
+                && (raw.len() - i == 2 || raw[i+2] == 47))
+        {
+            assert(invalid_relative_byte(raw@, i as int));
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+pub enum ComponentError<E> {
+    Link,
+    Parent,
+    Destination,
+    Observation(E),
+}
+
+/// Resolve precedence using the raw filesystem observation and preserve the original IO error.
+pub fn admit_component<E>(
+    observation: Result<(bool, bool, bool), (u32, E)>,
+    missing: u32,
+    publication: bool,
+    intermediate: bool,
+) -> (out: Result<(), ComponentError<E>>)
+    ensures match observation {
+        Ok((link, directory, file)) =>
+            if link { out == Err::<(), ComponentError<E>>(ComponentError::Link) }
+            else if publication && intermediate && !directory { out == Err::<(), ComponentError<E>>(ComponentError::Parent) }
+            else if publication && !intermediate && !file { out == Err::<(), ComponentError<E>>(ComponentError::Destination) }
+            else { out == Ok::<(), ComponentError<E>>(()) },
+        Err((kind, original)) =>
+            if kind == missing { out == Ok::<(), ComponentError<E>>(()) }
+            else { out == Err::<(), ComponentError<E>>(ComponentError::Observation(original)) },
+    },
+{
+    match observation {
+        Ok((true, _, _)) => Err(ComponentError::Link),
+        Ok((_, directory, file)) => {
+            if publication && intermediate && !directory { Err(ComponentError::Parent) }
+            else if publication && !intermediate && !file { Err(ComponentError::Destination) }
+            else { Ok(()) }
+        },
+        Err((kind, error)) => if kind == missing { Ok(()) } else { Err(ComponentError::Observation(error)) },
+    }
+}
+
+/// Create the parent only after the publication check and return the post-creation observation.
+pub fn publication_target<S, P, E, C, M>(state: S, check: C, make_parent: M)
+    -> (out: (S, Result<P, E>))
+    where C: Fn(S, bool) -> (S, Result<P, E>),
+          M: Fn(S, P) -> (S, Result<(), E>),
+    requires forall|s:S, publication:bool| check.requires((s, publication)),
+        forall|s:S, path:P| make_parent.requires((s, path)),
+    ensures exists|first:(S,Result<P,E>)| #[trigger] check.ensures((state, true), first)
+        && match first.1 {
+            Err(error) => out == (first.0, Err::<P,E>(error)),
+            Ok(path) => exists|made:(S,Result<(),E>)| #[trigger] make_parent.ensures((first.0, path), made)
+                && match made.1 {
+                    Err(error) => out == (made.0, Err::<P,E>(error)),
+                    Ok(()) => check.ensures((made.0, false), out),
+                },
+        },
+{
+    let first = check(state, true);
+    let ghost observed = first;
+    assert(check.ensures((state, true), observed));
+    let (state, path) = first;
+    let path = match path { Ok(path) => path, Err(error) => return (state, Err(error)) };
+    let made = make_parent(state, path);
+    let ghost completed = made;
+    assert(make_parent.ensures((state, path), completed));
+    let (state, prepared) = made;
+    match prepared { Err(error) => (state, Err(error)), Ok(()) => check(state, false) }
+}
+
 pub open spec fn path_line_break(byte: u8) -> bool {
     byte == 10 || byte == 13
 }

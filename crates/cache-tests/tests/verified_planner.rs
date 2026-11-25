@@ -3612,6 +3612,89 @@ fn expect_cache_true(actual: bool)
 }
 
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn host_relative_paths_preserve_normalized_components_and_reject_parents() {
+    broadcast use vstd::array::group_array_axioms;
+    let ordinary = [97u8, 47, 47, 46, 47, 206, 187, 47];
+    let hidden = [46u8, 46, 120];
+    let ending_parent = [97u8, 47, 46, 46];
+    let inner_parent = [97u8, 47, 46, 46, 47, 98];
+    let parent = [46u8, 46];
+    let absolute = [47u8];
+    let dot = [46u8];
+    let dot_leading = [46u8, 47, 97];
+    let backslash = [97u8, 92];
+    let nul = [97u8, 0];
+    let cr = [97u8, 13];
+    let lf = [97u8, 10];
+    let empty: [u8; 0] = [];
+    proof {
+        assert forall|i:int| 0 <= i < ordinary@.len() implies !policy::invalid_relative_byte(ordinary@, i) by {}
+        assert forall|i:int| 0 <= i < hidden@.len() implies !policy::invalid_relative_byte(hidden@, i) by {}
+        assert(policy::invalid_relative_byte(ending_parent@, 2));
+        assert(policy::invalid_relative_byte(inner_parent@, 2));
+        assert(policy::invalid_relative_byte(parent@, 0));
+        assert(policy::invalid_relative_byte(backslash@, 1));
+        assert(policy::invalid_relative_byte(nul@, 1));
+        assert(policy::invalid_relative_byte(cr@, 1));
+        assert(policy::invalid_relative_byte(lf@, 1));
+    }
+    expect_cache_true(policy::accepts_relative(&ordinary));
+    expect_cache_true(policy::accepts_relative(&hidden));
+    expect_cache_true(!policy::accepts_relative(&ending_parent));
+    expect_cache_true(!policy::accepts_relative(&inner_parent));
+    expect_cache_true(!policy::accepts_relative(&parent));
+    expect_cache_true(!policy::accepts_relative(&absolute));
+    expect_cache_true(!policy::accepts_relative(&dot));
+    expect_cache_true(!policy::accepts_relative(&dot_leading));
+    expect_cache_true(!policy::accepts_relative(&backslash));
+    expect_cache_true(!policy::accepts_relative(&nul));
+    expect_cache_true(!policy::accepts_relative(&cr));
+    expect_cache_true(!policy::accepts_relative(&lf));
+    expect_cache_true(!policy::accepts_relative(&empty));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn publication_checks_the_parent_or_final_component_and_preserves_observation_errors() {
+    use policy::ComponentError;
+    let file = (false, false, true);
+    let dir = (false, true, false);
+    let link = (true, false, false);
+    expect_cache_true(matches!(policy::admit_component::<u8>(Ok(link), 1, false, false), Err(ComponentError::Link)));
+    expect_cache_true(matches!(policy::admit_component::<u8>(Ok(link), 1, true, true), Err(ComponentError::Link)));
+    expect_cache_true(matches!(policy::admit_component::<u8>(Ok(file), 1, true, true), Err(ComponentError::Parent)));
+    expect_cache_true(matches!(policy::admit_component::<u8>(Ok(dir), 1, true, false), Err(ComponentError::Destination)));
+    expect_cache_true(policy::admit_component::<u8>(Ok(dir), 1, true, true).is_ok());
+    expect_cache_true(policy::admit_component::<u8>(Ok(file), 1, true, false).is_ok());
+    expect_cache_true(policy::admit_component::<u8>(Ok(file), 1, false, true).is_ok());
+    expect_cache_true(policy::admit_component::<u8>(Err((1, 9)), 1, true, false).is_ok());
+    let original = policy::admit_component::<u8>(Err((2, 17)), 1, false, true);
+    expect_cache_true(matches!(original, Err(ComponentError::Observation(17))));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn publication_stops_on_the_first_error_and_returns_the_rechecked_path() {
+    let check = |state:u8, publication:bool| -> (out:(u8,Result<u8,u8>))
+        ensures out == (if publication { 1u8 } else { 3u8 },
+            if state == 10 { Err::<u8,u8>(31) } else { Ok::<u8,u8>(if publication { 13 } else { 17 }) }),
+    {
+        (if publication { 1u8 } else { 3u8 },
+            if state == 10 { Err(31u8) } else { Ok(if publication { 13u8 } else { 17u8 }) })
+    };
+    let create = |state:u8, path:u8| -> (out:(u8,Result<(),u8>))
+        ensures out == (2u8, if state == 1 && path == 13 { Ok::<(),u8>(()) } else { Err::<(),u8>(40) }),
+    { (2u8, if state == 1 && path == 13 { Ok(()) } else { Err(40u8) }) };
+    let fail = |state:u8, path:u8| -> (out:(u8,Result<(),u8>))
+        ensures out == (2u8, Err::<(),u8>(45)),
+    { (2u8, Err(45u8)) };
+    let (state, path) = policy::publication_target(10, check, create);
+    expect_cache_true(state == 1 && matches!(path, Err(31)));
+    let (state, path) = policy::publication_target(0, check, fail);
+    expect_cache_true(state == 2 && matches!(path, Err(45)));
+    let (state, path) = policy::publication_target(0, check, create);
+    expect_cache_true(state == 3 && matches!(path, Ok(17)));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn file_probe_selects_one_absolute_line_and_trims_the_terminator() {
     broadcast use vstd::array::group_array_axioms;
     let path = [47u8, 206, 187, 13, 10, 10];
