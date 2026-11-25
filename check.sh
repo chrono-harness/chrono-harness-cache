@@ -7,6 +7,13 @@ if [[ $# -eq 0 ]]; then
   export CHRONO_CHECK_SOURCE=${CHRONO_CHECK_SOURCE:-local}
   exec .chrono-harness/bin/chrono-harness check
 fi
+# The supervisor gives each invocation its own leased directory.
+if [[ $1 == --native-in-directory && $# == 2 ]]; then
+  scratch=${CHRONO_NATIVE_SCRATCH:?missing native check directory}
+  shift
+else
+  scratch=
+fi
 phase=$1
 case "$phase" in
   --native|build|verify) ;;
@@ -16,9 +23,9 @@ if [[ $# -gt 1 || ( "$phase" != --native && -z "${CARGO_TARGET_DIR:-}" ) ]]; the
   echo "split native checks need a caller-owned CARGO_TARGET_DIR and a single phase" >&2
   exit 2
 fi
-mkdir -p target
-scratch=$(mktemp -d "$(pwd -P)/target/check.XXXXXXXX")
-trap 'rm -rf -- "$scratch"' EXIT
+if [[ -z "$scratch" ]]; then
+  exec chrono-host-bootstrap native-scratch run /bin/bash ./check.sh --native-in-directory "$phase"
+fi
 export TMPDIR="$scratch"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$scratch/cargo}"
 mkdir -p "$CARGO_TARGET_DIR"
