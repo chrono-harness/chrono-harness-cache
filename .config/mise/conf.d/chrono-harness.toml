@@ -3,11 +3,11 @@
 run_auto_install = false
 
 [tools."http:chrono-cache"]
-version = "0.1.0"
+version = "0.1.1-alpha.1"
 bin = "chrono-cache"
 [tools."http:chrono-cache".platforms]
-linux-x64 = { url = "https://github.com/chrono-harness/chrono-harness-cache/releases/download/v0.1.0/chrono-cache-linux-x86_64", checksum = "sha256:a69ba3445f885533cf44659b8f92cb36b76437a8f49f0ccc90d9255e5b637323" }
-macos-arm64 = { url = "https://github.com/chrono-harness/chrono-harness-cache/releases/download/v0.1.0/chrono-cache-macos-aarch64", checksum = "sha256:ba23b16b3437ab8ac6002cdcd74c9029d62f40784f4f3f044b0bf03f0313905e" }
+linux-x64 = { url = "https://github.com/chrono-harness/chrono-harness-cache/releases/download/v0.1.1-alpha.1/chrono-cache-linux-x86_64", checksum = "sha256:bb32a800a3781c54312de8f3f556fbcf8d985526231d27be3fd0581d1c4f96ca" }
+macos-arm64 = { url = "https://github.com/chrono-harness/chrono-harness-cache/releases/download/v0.1.1-alpha.1/chrono-cache-macos-aarch64", checksum = "sha256:fb24c50fa528e3cfe7a4cfac480c434a05b25422293a1c33cf46b9d76c32cbfe" }
 
 
 [tools."http:chrono-ci"]
