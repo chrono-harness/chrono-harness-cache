@@ -761,6 +761,31 @@
       ]
     },
     {
+      "path": "crates/cache/src/verified_cli.rs",
+      "owner": "cache",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:cache-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache/src/verified_planner.rs",
+            "operation": "verify.cache-planner"
+          },
+          {
+            "path": "crates/cache-tests/tests/verified_planner.rs",
+            "operation": "verify.cache-planner-tests"
+          }
+        ]
+      }
+    },
+    {
       "path": "crates/cache/src/verified_content.rs",
       "owner": "cache",
       "surface": "product",

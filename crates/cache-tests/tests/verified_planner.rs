@@ -30,6 +30,46 @@ mod probe;
 verus! {
 
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn cli_preserves_program_argument_coordinates_and_original_bytes() {
+    broadcast use vstd::array::group_array_axioms;
+    let raw = [0xffu8, 0xa0];
+    let program = policy::cli::argument(0, Some("cache"), &[99u8, 97, 99, 104, 101]);
+    expect_cache_true(matches!(program, Ok(None)));
+    let value = "α\n";
+    let argument = policy::cli::argument(1, Some(value), &[0xceu8, 0xb1, 10]);
+    expect_cache_true(matches!(argument, Ok(Some(s)) if policy::same_attempt(value, Some(s))));
+    let program = policy::cli::argument(0, None, &raw);
+    expect_cache_true(matches!(program, Err((0, None, b)) if b.len() == 2 && b[0] == 0xff && b[1] == 0xa0));
+    let argument = policy::cli::argument(4, None, &raw);
+    expect_cache_true(matches!(argument, Err((4, Some(3), b)) if b.len() == 2 && b[0] == 0xff && b[1] == 0xa0));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn cli_writes_the_original_to_the_selected_stream_and_observes_diagnostic_errors() {
+    let stdout = |_state: (u8, u8), b: &u8| -> (v: (u8, u8)) ensures v == (1u8, *b), { (1, *b) };
+    let stderr = |_state: (u8, u8), b: &u8| -> (v: (u8, u8)) ensures v == (2u8, *b), { (2, *b) };
+    let (stream, ok) = policy::cli::output((0, 0), Ok::<u8, u8>(42), stdout, stderr);
+    expect_cache_true(stream.0 == 1 && stream.1 == 42 && matches!(ok, Ok(0)));
+    let sink_failure = |e: u8| -> (r: Result<(), u8>) ensures r == Err::<(), u8>(e), { Err(e) };
+    expect_cache_true(matches!(policy::cli::finish_business(ok, sink_failure), Ok(0)));
+    let (stream, failed) = policy::cli::output((0, 0), Err::<u8, u8>(17), stdout, stderr);
+    expect_cache_true(stream.0 == 2 && stream.1 == 17 && matches!(failed, Err(17)));
+    let written = |_error: u8| -> (r: Result<(), u8>) ensures r == Ok::<(), u8>(()), { Ok(()) };
+    expect_cache_true(matches!(policy::cli::finish_business(failed, written), Ok(2)));
+    expect_cache_true(matches!(policy::cli::finish_business(failed, sink_failure), Err(17)));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn cli_sink_status_preserves_failure_overrides_and_unexpected_originals() {
+    expect_cache_true(matches!(policy::cli::diagnostics_exit(0, Some(0)), Ok(0)));
+    expect_cache_true(matches!(policy::cli::diagnostics_exit(0, Some(2)), Ok(2)));
+    expect_cache_true(matches!(policy::cli::diagnostics_exit(2, Some(2)), Ok(2)));
+    expect_cache_true(matches!(policy::cli::diagnostics_exit(2, Some(0)), Err(Some(0))));
+    expect_cache_true(matches!(policy::cli::diagnostics_exit(0, Some(73)), Err(Some(73))));
+    expect_cache_true(matches!(policy::cli::diagnostics_exit(0, None), Err(None)));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn content_rows_preserve_each_result_and_every_prior_failure() {
     let same = |a: u64, b: u64| -> (answer: bool) ensures answer == (a == b), { a == b };
     let mut all = true;
