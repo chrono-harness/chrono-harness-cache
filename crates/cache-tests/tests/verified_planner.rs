@@ -29,6 +29,31 @@ mod probe;
 
 verus! {
 
+fn admitted_json_pointers_bind_every_escape(raw: &[u8], i: usize)
+    requires i < raw.len(),
+{
+    let accepted = policy::json_pointer(raw);
+    if accepted {
+        assert(raw[0] == 47);
+        assert(policy::valid_pointer_escape(raw@, i as int));
+        if raw[i] == 126 {
+            assert(i + 1 < raw.len() && (raw[i + 1] == 48 || raw[i + 1] == 49));
+        }
+    }
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn planner_accepts_root_and_escaped_members_but_rejects_a_late_bad_escape() {
+    expect_cache_true(policy::json_pointer(&[]));
+    expect_cache_true(policy::json_pointer(&[47, 126, 49, 47, 126, 48, 195, 169]));
+    let bad = [47, 126, 48, 47, 126, 50];
+    let short = [47, 126];
+    assert(!policy::valid_pointer_escape(bad@, 4));
+    assert(!policy::valid_pointer_escape(short@, 1));
+    expect_cache_true(!policy::json_pointer(&bad));
+    expect_cache_true(!policy::json_pointer(&short));
+}
+
 fn record_publication_case(failure: u8, identity: usize, raw: &str,
     temporary: &str, parent_path: &str, stage_error: &str)
     requires failure <= 7,

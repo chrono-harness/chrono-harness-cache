@@ -52,6 +52,35 @@ pub use recovery_source::*;
 
 verus! {
 
+pub open spec fn valid_pointer_escape(raw: Seq<u8>, pos: int) -> bool
+    recommends 0 <= pos < raw.len(),
+{
+    raw[pos] != 126 || (pos + 1 < raw.len() && (raw[pos + 1] == 48 || raw[pos + 1] == 49))
+}
+
+/// Input::JsonValue uses the string form of RFC 6901, including the empty root pointer.
+pub fn json_pointer(raw: &[u8]) -> (valid: bool)
+    ensures valid == ((raw@.len() == 0 || raw@[0] == 47)
+        && forall|pos: int| 0 <= pos < raw@.len() ==> valid_pointer_escape(raw@, pos)),
+{
+    if raw.len() == 0 { return true; }
+    if raw[0] != 47 { return false; }
+    let mut pos = 0;
+    while pos < raw.len()
+        invariant raw.len() > 0, raw@[0] == 47, pos <= raw.len(),
+            forall|n: int| 0 <= n < pos ==> valid_pointer_escape(raw@, n),
+        decreases raw.len() - pos,
+    {
+        if raw[pos] == 126
+            && (pos + 1 == raw.len() || (raw[pos + 1] != 48 && raw[pos + 1] != 49)) {
+            assert(!valid_pointer_escape(raw@, pos as int));
+            return false;
+        }
+        pos += 1;
+    }
+    true
+}
+
 /// Rust paths on the supported Unix hosts admit internal empty and dot components.
 pub open spec fn invalid_relative_byte(raw: Seq<u8>, i: int) -> bool
     recommends 0 <= i < raw.len(),
