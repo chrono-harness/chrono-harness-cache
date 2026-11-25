@@ -90,9 +90,9 @@ included="$tests/../../cache/src"
 prove verify.cache-planner "$src/verified_planner.rs"
 prove verify.cache-planner-tests "$tests/verified_planner.rs"
 
-admit_proof verify.cache-planner "$src/verified_planner.rs" "$src/verified_content.rs" \
-  "$src/attempt.rs" "$src/recovery.rs" "$src/verified_cli.rs"
+admit_proof verify.cache-planner "$src/verified_planner.rs" "$src/verified_cli.rs" "$src/verified_content.rs" \
+  "$src/attempt.rs" "$src/recovery.rs"
 admit_proof verify.cache-planner-tests "$tests/verified_planner.rs" "$included/verified_planner.rs" \
-  "$included/verified_content.rs" "$included/attempt.rs" \
-  "$included/recovery.rs" "$included/verified_cli.rs" "$tests/continuity.rs" \
+  "$included/verified_cli.rs" "$included/verified_content.rs" "$included/attempt.rs" \
+  "$included/recovery.rs" "$tests/continuity.rs" \
   "$tests/keys.rs" "$tests/support/probe.rs"
