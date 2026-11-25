@@ -2,6 +2,8 @@
 
 计算、恢复和封存构建缓存。
 
+缓存计划的 `planner.version` 给出规划程序的产品版本，`planner.sha256` 标识生成计划的可执行文件。发行的预览后缀表示通道，同一候选晋升正式版时沿用相同的产品版本。
+
 使用 `cargo build --locked --manifest-path crates/cache/Cargo.toml` 构建。运行 `mise trust` 后执行 `mise exec -- ./check.sh`，根据 Git 变更选择已登记的格式、构建、测试及证明。
 
 源码来自 [固定版本的原实现](https://github.com/ChronoAIProject/chrono-harness/tree/5f6892dfa2f73675a84e4ebdc3b06eb83b824d6e/crates/cache)。

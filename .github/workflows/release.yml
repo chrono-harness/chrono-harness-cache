@@ -57,7 +57,10 @@ jobs:
           cp .github/fixtures/cache-plan/*.json "$host/.chrono-harness/"
           cp crates/cache/Cargo.lock crates/cache/Cargo.toml "$host/"
           "$binary" plan --host-root "$host" --config .chrono-harness/cache.json --consumer build > "$host/plan.json"
-          jq -e '.consumer == "build" and .consumer_operations.operations == ["build.cache"]
+          product_version=${GITHUB_REF_NAME#v}
+          jq -e --arg version "${product_version%%-*}" '
+                 .planner.version == $version and .consumer == "build"
+                 and .consumer_operations.operations == ["build.cache"]
                  and (.caches.cargo.key | type == "string" and length > 0)' "$host/plan.json"
           code=0
           "$binary" plan --host-root "$host" --config .chrono-harness/cache.json --consumer unknown 2>"$host/error" || code=$?
