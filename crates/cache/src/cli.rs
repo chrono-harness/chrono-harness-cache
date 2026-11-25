@@ -1,5 +1,5 @@
 //! Keep the caller's PID, typed argument bytes and business events in one diagnostics session.
-use crate::retention::installed;
+use crate::{retention::installed, verified_planner::cli as decision};
 use serde_json::{Value, json};
 use std::{
     ffi::OsString,
@@ -53,46 +53,39 @@ impl Sink {
     fn finish(mut self, exit: u8) -> io::Result<u8> {
         self.event(json!({"exit_code":exit}))?;
         self.writer.take();
-        match self.child.wait()?.code() {
-            Some(status) if status == i32::from(exit) => Ok(exit),
-            Some(2) => Ok(2),
-            status => Err(io::Error::other(format!(
-                "unexpected diagnostics status {status:?}"
-            ))),
-        }
+        decision::diagnostics_exit(exit, self.child.wait()?.code())
+            .map_err(|status| io::Error::other(format!("unexpected diagnostics status {status:?}")))
     }
 }
 
 fn drive(args: &[OsString], sink: &mut Option<Sink>) -> io::Result<u8> {
     let mut decoded = Vec::with_capacity(args.len());
     for (index, arg) in args.iter().enumerate() {
-        if let Some(value) = arg.to_str() {
-            if index != 0 {
-                decoded.push(value.to_owned());
+        match decision::argument(index, arg.to_str(), arg.as_encoded_bytes()) {
+            Ok(Some(value)) => decoded.push(value.to_owned()),
+            Ok(None) => {}
+            Err((argv_index, argument_index, bytes)) => {
+                if let Some(log) = sink.as_mut() {
+                    log.event(json!({"invalid_argument":{"argv_index":argv_index,"bytes":bytes}}))?;
+                } else {
+                    let error = json!({"schema":"chrono-error/v1","error":{"type":"chrono_cache::cli","code":"E_USAGE","message":"arguments must be valid UTF-8.","context":{"argv_index":argv_index,"argument_index":argument_index,"argument_bytes":bytes},"source":null}});
+                    eprintln!("{error}");
+                }
+                return Ok(2);
             }
-        } else {
-            let bytes = arg.as_encoded_bytes();
-            if let Some(log) = sink.as_mut() {
-                log.event(json!({"invalid_argument":{"argv_index":index,"bytes":bytes}}))?;
-            } else {
-                let error = json!({"schema":"chrono-error/v1","error":{"type":"chrono_cache::cli","code":"E_USAGE","message":"arguments must be valid UTF-8.","context":{"argv_index":index,"argument_index":index.checked_sub(1),"argument_bytes":bytes},"source":null}});
-                eprintln!("{error}");
-            }
-            return Ok(2);
         }
     }
-    let run = || match crate::dispatch(&decoded) {
-        Ok(output) => {
-            print!("{output}");
-            Ok(0)
-        }
-        Err(error) => {
-            eprintln!("{error}");
-            Err(error)
-        }
+    let run = || {
+        decision::output(
+            (),
+            crate::dispatch(&decoded),
+            |(), output| print!("{output}"),
+            |(), error| eprintln!("{error}"),
+        )
+        .1
     };
     let Some(writer) = sink.as_mut() else {
-        return Ok(run().unwrap_or(2));
+        return decision::finish_business(run(), |_| Ok(()));
     };
     let state = Arc::new(Mutex::new((
         writer.writer.take().unwrap(),
@@ -117,13 +110,7 @@ fn drive(args: &[OsString], sink: &mut Option<Sink>) -> io::Result<u8> {
         .unwrap();
     writer.writer = Some(input);
     published?;
-    match result {
-        Ok(code) => Ok(code),
-        Err(error) => {
-            writer.event(json!({"diagnostic":error}))?;
-            Ok(2)
-        }
-    }
+    decision::finish_business(result, |error| writer.event(json!({"diagnostic":error})))
 }
 fn host(args: &[OsString]) -> io::Result<PathBuf> {
     args.get(1..)

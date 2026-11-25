@@ -76,7 +76,7 @@ metadata=$(jq -ers --arg manifest "$(pwd -P)/$product" '
 filename=${metadata##*/}
 stem=${filename#lib}
 stem=${metadata%/*}/${stem%.rmeta}
-chrono-host-bootstrap check-compiler-sources native "$stem" src/verified_planner.rs src/verified_content.rs src/attempt.rs \
+chrono-host-bootstrap check-compiler-sources native "$stem" src/cli.rs src/verified_cli.rs src/verified_planner.rs src/verified_content.rs src/attempt.rs \
   src/recovery.rs src/content.rs src/probe.rs src/files.rs \
   src/lib.rs ||
   coverage_failure "native library differs from required sources"
@@ -91,8 +91,8 @@ prove verify.cache-planner "$src/verified_planner.rs"
 prove verify.cache-planner-tests "$tests/verified_planner.rs"
 
 admit_proof verify.cache-planner "$src/verified_planner.rs" "$src/verified_content.rs" \
-  "$src/attempt.rs" "$src/recovery.rs"
+  "$src/attempt.rs" "$src/recovery.rs" "$src/verified_cli.rs"
 admit_proof verify.cache-planner-tests "$tests/verified_planner.rs" "$included/verified_planner.rs" \
   "$included/verified_content.rs" "$included/attempt.rs" \
-  "$included/recovery.rs" "$tests/continuity.rs" \
+  "$included/recovery.rs" "$included/verified_cli.rs" "$tests/continuity.rs" \
   "$tests/keys.rs" "$tests/support/probe.rs"
