@@ -3,12 +3,9 @@ use super::*;
 
 fn bind_installed_planner(plan: &mut Value) {
     let binary = Path::new(env!("CARGO_BIN_EXE_chrono-cache-test-cli"));
-    plan["planner"] = json!({
-        "executable": fs::canonicalize(&binary).unwrap(),
-        "sha256": format!("{:x}", Sha256::digest(fs::read(&binary).unwrap())),
-        "bytes": fs::metadata(&binary).unwrap().len(),
-        "version": env!("CARGO_PKG_VERSION"),
-    });
+    plan["planner"]["executable"] = json!(fs::canonicalize(binary).unwrap());
+    plan["planner"]["sha256"] = json!(format!("{:x}", Sha256::digest(fs::read(binary).unwrap())));
+    plan["planner"]["bytes"] = json!(fs::metadata(binary).unwrap().len());
 }
 
 fn recovery_host() -> (Host, Value, Value) {
