@@ -255,12 +255,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
     for (id, input) in &c.inputs {
         name(id)?;
         if let Input::JsonValue { pointer, .. } = input {
-            if (!pointer.is_empty() && !pointer.starts_with('/'))
-                || pointer
-                    .split('~')
-                    .skip(1)
-                    .any(|part| !part.starts_with('0') && !part.starts_with('1'))
-            {
+            if !verified_planner::json_pointer(pointer.as_bytes()) {
                 return Err("E_CACHE_CONFIG: json-value requires an RFC 6901 pointer".into());
             }
         }
