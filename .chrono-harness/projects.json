@@ -26,10 +26,10 @@
             "2",
             "--output-json",
             "--compile",
-            "--emit=link=.chrono-harness/state/verify.cache-planner.rlib,dep-info=.chrono-harness/state/verify.cache-planner.rlib.d",
+            "--emit=link={operation_state}/verify.cache-planner.rlib,dep-info={operation_state}/verify.cache-planner.rlib.d",
             "crates/cache/src/verified_planner.rs",
             "-o",
-            ".chrono-harness/state/verify.cache-planner.rlib",
+            "{operation_state}/verify.cache-planner.rlib",
             "-Zchecksum-hash-algorithm=sha256"
           ],
           "output_contract": {
@@ -59,10 +59,10 @@
             "2",
             "--output-json",
             "--compile",
-            "--emit=link=.chrono-harness/state/verify.cache-planner-tests.rlib,dep-info=.chrono-harness/state/verify.cache-planner-tests.rlib.d",
+            "--emit=link={operation_state}/verify.cache-planner-tests.rlib,dep-info={operation_state}/verify.cache-planner-tests.rlib.d",
             "crates/cache-tests/tests/verified_planner.rs",
             "-o",
-            ".chrono-harness/state/verify.cache-planner-tests.rlib",
+            "{operation_state}/verify.cache-planner-tests.rlib",
             "-Zchecksum-hash-algorithm=sha256"
           ],
           "output_contract": {
