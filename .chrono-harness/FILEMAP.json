@@ -144,6 +144,22 @@
       }
     },
     {
+      "path": ".chrono-harness/maintain-checks.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:cache-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
       "path": ".chrono-harness/pr.json",
       "owner": "host",
       "surface": "product",
