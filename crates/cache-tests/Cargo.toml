@@ -57,3 +57,8 @@ bench = false
 [[test]]
 name = "deployed_host"
 path = "../../.chrono-harness/ci/host_adapters.rs"
+
+[[example]]
+name = "release_observation"
+path = "tests/release_observation.rs"
+test = true

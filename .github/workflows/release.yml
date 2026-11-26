@@ -62,14 +62,8 @@ jobs:
           cp crates/cache/Cargo.lock crates/cache/Cargo.toml "$host/"
           "$binary" plan --host-root "$host" --config .chrono-harness/cache.json --consumer build > "$host/plan.json"
           product_version=${GITHUB_REF_NAME#v}
-          jq -e --arg version "${product_version%%-*}" '
-                 .planner.version == $version and .consumer == "build"
-                 and .consumer_operations.operations == ["build.cache"]
-                 and (.caches.cargo.key | type == "string" and length > 0)' "$host/plan.json"
           code=0
           "$binary" plan --host-root "$host" --config .chrono-harness/cache.json --consumer unknown 2>"$host/error" || code=$?
-          test "$code" = 2
-          test -s "$host/error"
           cp crates/cache-tests/tests/fixtures/retention.json "$host/.chrono-harness/retention.json"
           jq --arg program "$(command -v uname)" '
             def probe($arg): {kind:"command",command:{program:$program,args:[$arg],env:{},timeout_seconds:10,output_limit_bytes:4096},inherit:[],result:"stdout"};
@@ -80,16 +74,8 @@ jobs:
           for pass in first replay; do
             "$binary" plan --host-root "$host" --config .chrono-harness/cache.json --consumer build --plan-output "$output" > "$host/$pass.json"
           done
-          cmp "$host/first.json" "$host/replay.json"
-          test "$(jq '.inputs | length' "$host/first.json")" = 2
-          for input in lock manifest; do
-            original=$(jq -er --arg input "$input" '.inputs[$input].original.path' "$host/first.json")
-            expected=$(jq -er --arg input "$input" '.inputs[$input].original.sha256' "$host/first.json")
-            jq -e '.exit_code == 0 and .owned_work_joined and .child_pid > 0' "$host/$original"
-            jq -e --slurpfile receipt "$host/$original" '.child_pid == $receipt[0].child_pid and .sha256 == $receipt[0].sha256' "$host/${original%/*}/launch.json"
-            printf '%s  %s\n' "$expected" "$host/$original" | shasum -a 256 -c -
-          done
-          jq -es 'any(.[]; .producer == "chrono-cache" and .event == "cache.plan.prepared")' "$host"/.chrono-harness/logs/*.jsonl
+          cargo run --quiet --release --locked --manifest-path crates/cache-tests/Cargo.toml \
+            --example release_observation -- "${product_version%%-*}" "$host" "$code"
           mkdir "$RUNNER_TEMP/dist"
           cp "$CARGO_TARGET_DIR/release/chrono-cache" "$RUNNER_TEMP/dist/chrono-cache-$PLATFORM"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

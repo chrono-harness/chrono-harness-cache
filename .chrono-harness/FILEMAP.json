@@ -436,7 +436,21 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:cache-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache-tests/tests/release_observation.rs",
+            "operation": "verify.cache-release"
+          }
+        ]
+      }
     },
     {
       "path": ".github/workflows/scoped.yml",
@@ -612,6 +626,27 @@
           "to": "test:cache-tests"
         }
       ]
+    },
+    {
+      "path": "crates/cache-tests/tests/release_observation.rs",
+      "owner": "cache-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:cache-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache-tests/tests/release_observation.rs",
+            "operation": "verify.cache-release"
+          }
+        ]
+      }
     },
     {
       "path": "crates/cache-tests/tests/support/cache_host.rs",
@@ -1005,6 +1040,7 @@
         "verify.cache-planner",
         "verify.cache-planner-tests",
         "verify.deployed-host",
+        "verify.cache-release",
         "cache.owner-check"
       ],
       "timeout_seconds": 600,
