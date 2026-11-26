@@ -537,7 +537,16 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache-tests/tests/release_observation.rs",
+            "operation": "verify.cache-release"
+          }
+        ]
+      }
     },
     {
       "path": "crates/cache-tests/Cargo.lock",

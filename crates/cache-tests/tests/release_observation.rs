@@ -83,6 +83,26 @@ fn release_observer_rejects_different_inputs_and_processes() {
     expect_release(!planned_event(&wrong, &"cache.plan.prepared".to_string()));
 }
 
+fn deployed_check() -> &'static str { include_str!("../../../check.sh") }
+
+/// Compare each complete source argument, including its ordering in the compiler receipt.
+fn source_arguments(actual: &[&str], expected: &[&str]) -> (matches: bool)
+    ensures matches == (actual.len() == expected.len() && forall|i: int| 0 <= i < expected.len()
+        ==> actual@[i]@ == expected@[i]@),
+{
+    if actual.len() != expected.len() { return false; }
+    let mut i = 0;
+    while i < expected.len()
+        invariant i <= expected.len(), actual.len() == expected.len(),
+            forall|j: int| 0 <= j < i ==> actual@[j]@ == expected@[j]@,
+        decreases expected.len() - i,
+    {
+        if !<&str as vstd::contrib::exec_spec::ExecSpecEq>::exec_eq(actual[i], expected[i]) { return false; }
+        i += 1;
+    }
+    true
+}
+
 fn deployed_workflow() -> (source: &'static str) { include_str!("../../../.github/workflows/release.yml") }
 }
 
@@ -177,6 +197,51 @@ mod native {
             return Err("missing prepared event".into());
         }
         Ok(())
+    }
+
+    #[test]
+    fn split_verification_binds_every_compiler_input_in_order() {
+        let script = deployed_check().replace("\\\n", " ");
+        let admissions: Vec<_> = script
+            .lines()
+            .filter_map(|line| line.strip_prefix("admit_proof "))
+            .collect();
+        let product = [
+            "verify.cache-planner",
+            "$src/verified_planner.rs",
+            "$src/files.rs",
+            "$src/verified_cli.rs",
+            "$src/verified_content.rs",
+            "$src/attempt.rs",
+            "$src/recovery.rs",
+        ];
+        let tests = [
+            "verify.cache-planner-tests",
+            "$tests/verified_planner.rs",
+            "$included/verified_planner.rs",
+            "$included/files.rs",
+            "$included/verified_cli.rs",
+            "$included/verified_content.rs",
+            "$included/attempt.rs",
+            "$included/recovery.rs",
+            "$tests/continuity.rs",
+            "$tests/keys.rs",
+            "$tests/support/probe.rs",
+            "$tests/recovery.rs",
+            "$tests/support/cache_host.rs",
+            "$tests/support/mock_inventory.rs",
+        ];
+        assert_eq!(admissions.len(), 2);
+        for (line, expected) in admissions
+            .iter()
+            .zip([product.as_slice(), tests.as_slice()])
+        {
+            let argv: Vec<_> = line
+                .split_whitespace()
+                .map(|arg| arg.trim_matches('"'))
+                .collect();
+            assert!(source_arguments(&argv, expected), "{argv:?}");
+        }
     }
 
     #[test]
