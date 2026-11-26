@@ -1,14 +1,12 @@
 #![allow(unexpected_cfgs)]
-use vstd::prelude::*;
+use vstd::{prelude::*, string::StringExecFns};
 
 verus! {
 /// Keep the complete plan digest in the mock host's persisted attempt path.
 pub fn attempt_address(digest: &str) -> (result: String)
     ensures result@ == ".chrono-harness/state/cache-probes/plan-"@ + digest@,
 {
-    let mut result = ".chrono-harness/state/cache-probes/plan-".to_owned();
-    result.push_str(digest);
-    result
+    ".chrono-harness/state/cache-probes/plan-".to_owned().concat(digest)
 }
 }
 
