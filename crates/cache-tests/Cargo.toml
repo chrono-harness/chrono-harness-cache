@@ -15,6 +15,7 @@ sha2 = "0.11"
 verus_builtin_macros = "=0.0.0-2026-04-20-1748"
 
 [dev-dependencies]
+serde_yaml = { package = "serde_yaml_ng", version = "0.10" }
 toml = { version = "1.2", default-features = false, features = ["parse", "serde", "std"] }
 libc = "0.2"
 tempfile = "3"

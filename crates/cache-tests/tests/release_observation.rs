@@ -103,6 +103,8 @@ fn source_arguments(actual: &[&str], expected: &[&str]) -> (matches: bool)
     true
 }
 
+fn native_workflow() -> (source: &'static str) { include_str!("../../../.github/workflows/check.yml") }
+
 fn deployed_workflow() -> (source: &'static str) { include_str!("../../../.github/workflows/release.yml") }
 }
 
@@ -242,6 +244,36 @@ mod native {
                 .collect();
             assert!(source_arguments(&argv, expected), "{argv:?}");
         }
+    }
+
+    #[test]
+    fn macos_check_builds_through_the_cache_before_running_native_proofs() {
+        let workflow: serde_yaml::Value = serde_yaml::from_str(native_workflow()).unwrap();
+        let job = &workflow["jobs"]["check"];
+        assert_eq!(job["runs-on"].as_str(), Some("macos-15"));
+        let steps = job["steps"].as_sequence().unwrap();
+        let commands: Vec<_> = steps
+            .iter()
+            .filter_map(|step| {
+                if let Some(action) = step["uses"].as_str() {
+                    return Some(action.split('@').next().unwrap());
+                }
+                step["run"].as_str()
+            })
+            .collect();
+        let build = commands
+            .iter()
+            .position(|step| *step == "./.github/actions/native-check")
+            .unwrap();
+        assert!(source_arguments(
+            &commands[..2],
+            &["actions/checkout", "jdx/mise-action"]
+        ));
+        assert!(commands[2].contains(".chrono-harness/ci/prepare-cargo"));
+        assert_eq!(build, 3);
+        assert_eq!(commands.get(build + 1), Some(&"./check.sh verify"));
+        assert_eq!(commands.get(build + 2), Some(&"actions/upload-artifact"));
+        assert!(commands.last().unwrap().contains("debug/incremental"));
     }
 
     #[test]
