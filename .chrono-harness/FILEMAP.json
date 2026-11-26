@@ -736,7 +736,11 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "crates/cache/Cargo.toml",
@@ -748,7 +752,11 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "crates/cache/src/attempt.rs",
@@ -833,7 +841,16 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache/src/freshness.rs",
+            "operation": "verify.cache-freshness"
+          }
+        ]
+      }
     },
     {
       "path": "crates/cache/src/lib.rs",
@@ -1038,6 +1055,7 @@
     "test:cache-tests": {
       "operations": [
         "verify.cache-planner",
+        "verify.cache-freshness",
         "verify.cache-planner-tests",
         "verify.deployed-host",
         "verify.cache-release",
