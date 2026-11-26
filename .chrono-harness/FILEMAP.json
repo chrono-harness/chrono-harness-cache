@@ -411,6 +411,17 @@
       "edges": []
     },
     {
+      "path": ".github/dependabot.yml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
+    },
+    {
       "path": ".github/fixtures/cache-plan/build.json",
       "owner": "host",
       "surface": "product",
@@ -430,6 +441,17 @@
       "surface": "product",
       "cost": "unmeasured",
       "edges": []
+    },
+    {
+      "path": ".github/workflows/dependabot-auto-merge.yml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".github/workflows/release.yml",
