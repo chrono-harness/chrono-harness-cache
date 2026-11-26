@@ -876,7 +876,10 @@ mod behavior {
         let inventory = crate::cache_host::mock_inventory::Inventory::adopted(root.path())
             .unwrap()
             .unwrap();
-        let role = format!("cache-plan:{}", hex::encode(Sha256::digest(attempt.as_bytes())));
+        let role = format!(
+            "cache-plan:{}",
+            hex::encode(Sha256::digest(attempt.as_bytes()))
+        );
         assert!(
             inventory
                 .rooted_original("cache-probe-attempt", &role)

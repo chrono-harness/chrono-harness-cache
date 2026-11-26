@@ -1,11 +1,30 @@
+#![allow(unexpected_cfgs)]
+use vstd::prelude::*;
+
+verus! {
+/// Keep the complete plan digest in the mock host's persisted attempt path.
+pub fn attempt_address(digest: &str) -> (result: String)
+    ensures result@ == ".chrono-harness/state/cache-probes/plan-"@ + digest@,
+{
+    let mut result = ".chrono-harness/state/cache-probes/plan-".to_owned();
+    result.push_str(digest);
+    result
+}
+}
+
 #[path = "mock_inventory.rs"]
 pub mod mock_inventory;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use sha2::{Digest, Sha256};
+#[cfg(not(verus_keep_ghost))]
 use std::{fs, path::Path, process::Command};
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Host(tempfile::TempDir);
 
+#[cfg(not(verus_keep_ghost))]
 impl Host {
     pub(crate) fn new() -> Self {
         let retained = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -19,6 +38,7 @@ impl Host {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Drop for Host {
     fn drop(&mut self) {
         if std::thread::panicking() {
@@ -33,6 +53,7 @@ impl Drop for Host {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn fixture() -> (Host, Value) {
     let root = Host::new();
     fs::create_dir(root.path().join(".chrono-harness")).unwrap();
@@ -62,6 +83,7 @@ pub(crate) fn fixture() -> (Host, Value) {
     (root, config)
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn register_artifacts(root: &Path, config: &Value) {
     let rows: Vec<_> = config["artifacts"].as_object().unwrap().values()
         .map(|a| json!({"path":a["path"],"owner":a["owner"],"kind":"fixture-output","tracked":false})).collect();
@@ -72,6 +94,7 @@ pub(crate) fn register_artifacts(root: &Path, config: &Value) {
     .unwrap();
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn register_consumer_contract(root: &Path, config: &mut Value) {
     fs::write(
         root.join(".chrono-harness/operations.json"),
@@ -85,6 +108,7 @@ pub(crate) fn register_consumer_contract(root: &Path, config: &mut Value) {
     });
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn probe_config(root: &Path, config: &mut Value, args: Value) {
     config["inputs"]["compiler"] = json!({"kind":"command","command":{
     "program":env!("CARGO_BIN_EXE_chrono-cache-test-probe"),"args":args,"env":{},
@@ -96,6 +120,7 @@ pub(crate) fn probe_config(root: &Path, config: &mut Value, args: Value) {
     .unwrap();
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn plan_args(root: &Path, output: &str) -> Vec<String> {
     [
         "plan",
@@ -112,13 +137,14 @@ pub(crate) fn plan_args(root: &Path, output: &str) -> Vec<String> {
     .to_vec()
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn attempt_path(root: &Path, output: &str) -> std::path::PathBuf {
-    root.join(format!(
-        ".chrono-harness/state/cache-probes/plan-{}",
-        hex::encode(Sha256::digest(output.as_bytes()))
-    ))
+    root.join(attempt_address(&hex::encode(Sha256::digest(
+        output.as_bytes(),
+    ))))
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn invoke(root: &Path, output: &str) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_chrono-cache-test-cli"))
         .args(plan_args(root, output))
@@ -126,6 +152,7 @@ pub(crate) fn invoke(root: &Path, output: &str) -> std::process::Output {
         .unwrap()
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn seal(root: &Path, output: &str, cache: Option<&str>) -> std::process::Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_chrono-cache-test-cli"));
     command.args([
@@ -150,6 +177,7 @@ pub(crate) fn seal(root: &Path, output: &str, cache: Option<&str>) -> std::proce
         .unwrap()
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn mock_git(root: &Path) {
     fs::create_dir(root.join(".git")).unwrap();
     fs::write(
@@ -165,6 +193,7 @@ pub(crate) fn mock_git(root: &Path) {
     .unwrap();
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn recover(root: &Path, steps: &Value) -> std::process::Output {
     Command::new(Path::new(env!("CARGO_BIN_EXE_chrono-cache-test-cli")))
         .args([

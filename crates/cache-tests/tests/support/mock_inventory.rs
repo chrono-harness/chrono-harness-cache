@@ -1,6 +1,28 @@
 //! Observable replies of the test custodian. Only the runner verifies its real inventory and leases.
+#![allow(unexpected_cfgs)]
+use vstd::prelude::*;
+
+verus! {
+/// The mock custodian admits a member only when length and full digest agree.
+pub fn member_identity<F: FnOnce() -> String>(actual_len: u64, expected_len: u64,
+    expected: &str, hash: F) -> (ok: bool)
+    requires actual_len == expected_len ==> hash.requires(()),
+    ensures if actual_len != expected_len { !ok }
+        else { exists|digest: String| hash.ensures((), digest) && ok == (digest@ == expected@) },
+{
+    if actual_len != expected_len { return false; }
+    let digest = hash();
+    let ok = <&str as vstd::contrib::exec_spec::ExecSpecEq>::exec_eq(digest.as_str(), expected);
+    proof { assert(hash.ensures((), digest)); }
+    ok
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use sha2::{Digest, Sha256};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     collections::BTreeMap,
     fs,
@@ -8,17 +30,24 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(not(verus_keep_ghost))]
 type Records = BTreeMap<String, Value>;
+#[cfg(not(verus_keep_ghost))]
 type TestResult<T> = Result<T, String>;
+#[cfg(not(verus_keep_ghost))]
 pub fn hash(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn member_bytes(root: &Path, path: &str, digest: &str, length: u64) -> bool {
-    fs::read(root.join(path)).is_ok_and(|raw| raw.len() as u64 == length && hash(&raw) == digest)
+    fs::read(root.join(path))
+        .is_ok_and(|raw| member_identity(raw.len() as u64, length, digest, || hash(&raw)))
 }
+#[cfg(not(verus_keep_ghost))]
 pub struct Inventory {
     pub root: PathBuf,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Inventory {
     pub fn adopted(root: &Path) -> TestResult<Option<Self>> {
         Ok(Some(Self {

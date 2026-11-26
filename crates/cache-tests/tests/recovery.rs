@@ -1,6 +1,16 @@
+#![allow(unexpected_cfgs)]
+#[cfg(verus_keep_ghost)]
+use super::{expect_cache_true, policy};
+#[cfg(not(verus_keep_ghost))]
+use chrono_cache::verified_planner as policy;
+use vstd::prelude::*;
+
+#[cfg(not(verus_keep_ghost))]
 pub(super) use super::cache_host::recover;
+#[cfg(not(verus_keep_ghost))]
 use super::*;
 
+#[cfg(not(verus_keep_ghost))]
 fn bind_installed_planner(plan: &mut Value) {
     let binary = Path::new(env!("CARGO_BIN_EXE_chrono-cache-test-cli"));
     plan["planner"]["executable"] = json!(fs::canonicalize(binary).unwrap());
@@ -8,6 +18,7 @@ fn bind_installed_planner(plan: &mut Value) {
     plan["planner"]["bytes"] = json!(fs::metadata(binary).unwrap().len());
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn recovery_host() -> (Host, Value, Value) {
     let (root, mut config) = fixture();
     fs::create_dir(root.path().join(".git")).unwrap();
@@ -35,6 +46,7 @@ fn recovery_host() -> (Host, Value, Value) {
     (root, config, prepared)
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn adopt_source_refresh(root: &Path, config: &mut Value) -> Value {
     config["caches"]["project"]["refresh_sources"] = json!(true);
     let mut prepared = plan(root, config, "check.one").unwrap();
@@ -49,6 +61,7 @@ fn adopt_source_refresh(root: &Path, config: &mut Value) -> Value {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn source_refresh_is_local_to_compatible_hits_and_replay_keeps_later_timestamps() {
     use std::time::{Duration, SystemTime};
     let old = SystemTime::UNIX_EPOCH + Duration::from_secs(1);
@@ -121,6 +134,7 @@ fn source_refresh_is_local_to_compatible_hits_and_replay_keeps_later_timestamps(
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn registered_source_refresh_rejects_changed_inputs_before_any_mutation() {
     for changed in [false, true] {
         let (root, mut config, _) = recovery_host();
@@ -178,6 +192,7 @@ fn registered_source_refresh_rejects_changed_inputs_before_any_mutation() {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn result(root: &Path) -> Value {
     let pointer: Value = serde_json::from_slice(
         &fs::read(root.join(".chrono-harness/state/restore/recovery.json")).unwrap(),
@@ -189,6 +204,7 @@ fn result(root: &Path) -> Value {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn failed_restore_clears_only_its_registered_artifacts_and_does_not_repeat_after_build() {
     let (root, _, _) = recovery_host();
     let log_dir = ".chrono-harness/state/recovery-logs/";
@@ -274,6 +290,7 @@ fn failed_restore_clears_only_its_registered_artifacts_and_does_not_repeat_after
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn successful_or_skipped_restore_keeps_outputs_and_missing_observations_fail() {
     for outcome in [
         Some("success"),
@@ -305,6 +322,7 @@ fn successful_or_skipped_restore_keeps_outputs_and_missing_observations_fail() {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn adopt_unconfirmed_recovery(root: &Path, config: &mut Value, original: &Value) {
     config["recover_unconfirmed_restores"] = json!(true);
     let mut prepared = plan(root, config, "check.one").unwrap();
@@ -320,6 +338,7 @@ fn adopt_unconfirmed_recovery(root: &Path, config: &mut Value, original: &Value)
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn unconfirmed_success_discards_partial_outputs_and_retains_original_uncertainty() {
     for matched in [None, Some(""), Some("unregistered-key")] {
         let (root, mut config, prepared) = recovery_host();
@@ -370,6 +389,7 @@ fn unconfirmed_success_discards_partial_outputs_and_retains_original_uncertainty
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn unconfirmed_recovery_keeps_matching_hits_and_rejects_missing_or_malformed_observations() {
     for kind in [
         "exact",
@@ -417,6 +437,7 @@ fn unconfirmed_recovery_keeps_matching_hits_and_rejects_missing_or_malformed_obs
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn unconfirmed_recovery_requires_failed_restore_adoption_and_keeps_cold_miss_uncertain() {
     let (root, mut config, prepared) = recovery_host();
     config["recover_unconfirmed_restores"] = json!(true);
@@ -457,6 +478,7 @@ fn unconfirmed_recovery_requires_failed_restore_adoption_and_keeps_cold_miss_unc
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn changed_registration_and_symlinked_outputs_preserve_original_failure_without_discard() {
     for alter in ["registration", "output", "unfinished"] {
         let (root, mut config, _) = recovery_host();
@@ -504,6 +526,7 @@ fn changed_registration_and_symlinked_outputs_preserve_original_failure_without_
 
 #[cfg(unix)]
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn partial_cleanup_failure_retains_each_result_and_refuses_a_second_deletion() {
     let (root, mut config, _) = recovery_host();
     config["artifacts"]["zz-socket"] = json!({
@@ -558,6 +581,7 @@ fn partial_cleanup_failure_retains_each_result_and_refuses_a_second_deletion() {
     );
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn verified_host() -> (Host, Value, Value) {
     let (root, mut config, _) = recovery_host();
     config["recover_unconfirmed_restores"] = json!(true);
@@ -577,6 +601,7 @@ fn verified_host() -> (Host, Value, Value) {
     (root, config, prepared)
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn seal(root: &Path, steps: &Value) -> std::process::Output {
     seal_plan(
         root,
@@ -586,6 +611,7 @@ fn seal(root: &Path, steps: &Value) -> std::process::Output {
     )
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn seal_plan(root: &Path, steps: &Value, plan: &str, cache: Option<&str>) -> std::process::Output {
     let mut command = Command::new(Path::new(env!("CARGO_BIN_EXE_chrono-cache-test-cli")));
     command.args([
@@ -618,6 +644,7 @@ fn seal_plan(root: &Path, steps: &Value, plan: &str, cache: Option<&str>) -> std
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn producer_seal_records_absent_artifacts_without_authorizing_save() {
     for missing in ["target", "second", "both"] {
         let (root, mut config, _) = verified_host();
@@ -711,6 +738,7 @@ fn producer_seal_records_absent_artifacts_without_authorizing_save() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn producer_seal_refuses_present_invalid_artifact_roots() {
     for kind in ["file", "symlink"] {
         let (root, _, _) = verified_host();
@@ -739,6 +767,7 @@ fn producer_seal_refuses_present_invalid_artifact_roots() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn verified_hit_requires_producer_seal_and_retains_mismatched_content_before_recovery() {
     for mutation in [
         "none",
@@ -830,6 +859,7 @@ fn verified_hit_requires_producer_seal_and_retains_mismatched_content_before_rec
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn producer_seal_refuses_failure_and_compatible_restore_checks_original_source_key() {
     let (root, config, prepared) = verified_host();
     let rejected = seal(
@@ -874,6 +904,7 @@ fn producer_seal_refuses_failure_and_compatible_restore_checks_original_source_k
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn opted_in_failed_producer_seals_bytes_and_preserves_the_original_failure() {
     for outcome in [
         json!("success"),
@@ -983,6 +1014,7 @@ fn opted_in_failed_producer_seals_bytes_and_preserves_the_original_failure() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn failed_producer_saving_requires_content_verification() {
     let (_, mut config, _) = verified_host();
     config["caches"]["project"]["save_on_failure"] = json!(true);
@@ -996,6 +1028,7 @@ fn failed_producer_saving_requires_content_verification() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn retired_acceptance_registration_and_cli_fail_without_changing_outputs() {
     let (root, mut config, _) = verified_host();
     config["acceptance_fixtures"] = json!({"native-unusable":{
@@ -1008,4 +1041,36 @@ fn retired_acceptance_registration_and_cli_fail_without_changing_outputs() {
         .unwrap();
     assert!(!output.status.success());
     assert!(root.path().join("out/project/partial").is_file());
+}
+
+verus! {
+#[cfg(not(verus_keep_ghost))]
+fn expect_cache_true(v: bool) { assert!(v); }
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn only_observed_success_or_opted_in_failure_can_seal() {
+    proof {
+        reveal_strlit("success"); reveal_strlit("failure");
+        reveal_strlit("skipped"); reveal_strlit("cancelled");
+        reveal_strlit("success\n"); reveal_strlit("");
+        assert("success"@[0] != "failure"@[0]);
+        assert("success"@[1] != "skipped"@[1]);
+        assert("failure"@[0] != "skipped"@[0]);
+        assert("success"@.len() != "cancelled"@.len());
+        assert("failure"@.len() != "cancelled"@.len());
+        assert("success"@.len() != "success\n"@.len());
+        assert("failure"@.len() != "success\n"@.len());
+        assert("success"@.len() != ""@.len());
+        assert("failure"@.len() != ""@.len());
+    }
+    expect_cache_true(policy::producer_can_seal(false, Some("success")));
+    expect_cache_true(policy::producer_can_seal(true, Some("success")));
+    expect_cache_true(!policy::producer_can_seal(false, Some("failure")));
+    expect_cache_true(policy::producer_can_seal(true, Some("failure")));
+    expect_cache_true(!policy::producer_can_seal(true, Some("skipped")));
+    expect_cache_true(!policy::producer_can_seal(true, Some("cancelled")));
+    expect_cache_true(!policy::producer_can_seal(true, Some("success\n")));
+    expect_cache_true(!policy::producer_can_seal(true, Some("")));
+    expect_cache_true(!policy::producer_can_seal(false, None));
+    expect_cache_true(!policy::producer_can_seal(true, None));
+}
 }
