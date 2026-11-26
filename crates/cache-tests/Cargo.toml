@@ -6,6 +6,7 @@ publish = false
 autotests = false
 
 [dependencies]
+vstd = "=0.0.0-2026-04-20-1748"
 chrono-cache = { path = "../cache" }
 
 serde_json = "1"

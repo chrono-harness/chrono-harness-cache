@@ -58,6 +58,7 @@ dependencies = [
  "tempfile",
  "toml",
  "verus_builtin_macros",
+ "vstd",
 ]
 
 [[package]]
