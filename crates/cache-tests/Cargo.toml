@@ -13,6 +13,7 @@ sha2 = "0.10"
 verus_builtin_macros = "=0.0.0-2026-04-20-1748"
 
 [dev-dependencies]
+toml = { version = "0.9", default-features = false, features = ["parse", "serde", "std"] }
 libc = "0.2"
 tempfile = "3"
 
@@ -52,3 +53,12 @@ name = "chrono-cache-mock-owner"
 path = "tests/support/mock_owner.rs"
 test = false
 bench = false
+
+[[test]]
+name = "deployed_host"
+path = "../../.chrono-harness/ci/host_adapters.rs"
+
+[[example]]
+name = "release_observation"
+path = "tests/release_observation.rs"
+test = true

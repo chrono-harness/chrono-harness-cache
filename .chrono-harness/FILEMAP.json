@@ -59,6 +59,27 @@
       "edges": []
     },
     {
+      "path": ".chrono-harness/ci/host_adapters.rs",
+      "owner": "host",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:cache-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": ".chrono-harness/ci/host_adapters.rs",
+            "operation": "verify.deployed-host"
+          }
+        ]
+      }
+    },
+    {
       "path": ".chrono-harness/ci/install.sh",
       "owner": "host",
       "surface": "product",
@@ -142,7 +163,16 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": ".chrono-harness/ci/host_adapters.rs",
+            "operation": "verify.deployed-host"
+          }
+        ]
+      }
     },
     {
       "path": ".chrono-harness/judges.json",
@@ -227,7 +257,11 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".chrono-harness/workflow.json",
@@ -266,7 +300,11 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".config/mise/conf.d/chrono-harness.toml",
@@ -278,7 +316,16 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": ".chrono-harness/ci/host_adapters.rs",
+            "operation": "verify.deployed-host"
+          }
+        ]
+      }
     },
     {
       "path": ".config/mise/conf.d/selected-chrono-harness.toml",
@@ -290,7 +337,16 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": ".chrono-harness/ci/host_adapters.rs",
+            "operation": "verify.deployed-host"
+          }
+        ]
+      }
     },
     {
       "path": ".github/ISSUE_TEMPLATE/bug.yml",
@@ -380,7 +436,21 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:cache-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache-tests/tests/release_observation.rs",
+            "operation": "verify.cache-release"
+          }
+        ]
+      }
     },
     {
       "path": ".github/workflows/scoped.yml",
@@ -457,7 +527,11 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "crates/cache-tests/Cargo.toml",
@@ -469,7 +543,11 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "crates/cache-tests/tests/continuity.rs",
@@ -548,6 +626,27 @@
           "to": "test:cache-tests"
         }
       ]
+    },
+    {
+      "path": "crates/cache-tests/tests/release_observation.rs",
+      "owner": "cache-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:cache-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache-tests/tests/release_observation.rs",
+            "operation": "verify.cache-release"
+          }
+        ]
+      }
     },
     {
       "path": "crates/cache-tests/tests/support/cache_host.rs",
@@ -940,6 +1039,8 @@
       "operations": [
         "verify.cache-planner",
         "verify.cache-planner-tests",
+        "verify.deployed-host",
+        "verify.cache-release",
         "cache.owner-check"
       ],
       "timeout_seconds": 600,
