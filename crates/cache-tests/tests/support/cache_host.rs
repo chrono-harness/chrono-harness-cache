@@ -114,8 +114,8 @@ pub(crate) fn plan_args(root: &Path, output: &str) -> Vec<String> {
 
 pub(crate) fn attempt_path(root: &Path, output: &str) -> std::path::PathBuf {
     root.join(format!(
-        ".chrono-harness/state/cache-probes/plan-{:x}",
-        Sha256::digest(output.as_bytes())
+        ".chrono-harness/state/cache-probes/plan-{}",
+        hex::encode(Sha256::digest(output.as_bytes()))
     ))
 }
 

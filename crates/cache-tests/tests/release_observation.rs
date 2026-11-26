@@ -152,7 +152,7 @@ mod native {
                 &text(&receipt["sha256"])?,
                 &text(&launch["sha256"])?,
                 &text(&original["sha256"])?,
-                &format!("{:x}", Sha256::digest(&bytes)),
+                &hex::encode(Sha256::digest(&bytes)),
             ) {
                 return Err(format!("{input} process receipt differs").into());
             }

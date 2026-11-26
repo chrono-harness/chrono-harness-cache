@@ -10,7 +10,7 @@ use std::{
 };
 
 pub fn sha256(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    hex::encode(Sha256::digest(bytes))
 }
 
 pub fn digest<T: Serialize>(input: &T) -> Result<String, String> {
@@ -30,9 +30,9 @@ pub fn file_identity(path: &Path) -> Result<(String, u64), String> {
     if !input.metadata().map_err(|e| e.to_string())?.is_file() {
         return Err(format!("not a regular input file: {}", path.display()));
     }
-    let mut hash = Sha256::new();
+    let mut hash = digest_io::IoWrapper(Sha256::new());
     let size = io::copy(&mut input, &mut hash).map_err(|e| e.to_string())?;
-    Ok((format!("{:x}", hash.finalize()), size))
+    Ok((hex::encode(hash.0.finalize()), size))
 }
 
 pub fn relative_path(value: &str) -> Result<(), String> {

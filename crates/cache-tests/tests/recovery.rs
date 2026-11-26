@@ -4,7 +4,7 @@ use super::*;
 fn bind_installed_planner(plan: &mut Value) {
     let binary = Path::new(env!("CARGO_BIN_EXE_chrono-cache-test-cli"));
     plan["planner"]["executable"] = json!(fs::canonicalize(binary).unwrap());
-    plan["planner"]["sha256"] = json!(format!("{:x}", Sha256::digest(fs::read(binary).unwrap())));
+    plan["planner"]["sha256"] = json!(hex::encode(Sha256::digest(fs::read(binary).unwrap())));
     plan["planner"]["bytes"] = json!(fs::metadata(binary).unwrap().len());
 }
 
@@ -184,7 +184,7 @@ fn result(root: &Path) -> Value {
     )
     .unwrap();
     let raw = fs::read(root.join(pointer["path"].as_str().unwrap())).unwrap();
-    assert_eq!(pointer["sha256"], format!("{:x}", Sha256::digest(&raw)));
+    assert_eq!(pointer["sha256"], hex::encode(Sha256::digest(&raw)));
     serde_json::from_slice(&raw).unwrap()
 }
 

@@ -11,7 +11,7 @@ use std::{
 type Records = BTreeMap<String, Value>;
 type TestResult<T> = Result<T, String>;
 pub fn hash(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    hex::encode(Sha256::digest(bytes))
 }
 pub fn member_bytes(root: &Path, path: &str, digest: &str, length: u64) -> bool {
     fs::read(root.join(path)).is_ok_and(|raw| raw.len() as u64 == length && hash(&raw) == digest)
