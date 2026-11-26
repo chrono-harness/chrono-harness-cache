@@ -1,6 +1,51 @@
 //! The installed runner owns publication locks, original process streams and retention metadata.
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
+
+verus! {
+/// A missing policy suppresses startup. Every other failure retains the caller's error.
+pub fn open_if_configured<T, E, F: FnOnce() -> Result<T, E>>(
+    policy: Result<(), Option<E>>, open: F,
+) -> (result: Result<Option<T>, E>)
+    requires policy.is_ok() ==> open.requires(()),
+    ensures match policy {
+        Ok(()) => match result {
+            Ok(Some(service)) => open.ensures((), Ok(service)),
+            Err(error) => open.ensures((), Err(error)),
+            Ok(None) => false,
+        },
+        Err(None) => result == Ok::<Option<T>, E>(None),
+        Err(Some(error)) => result == Err::<Option<T>, E>(error),
+    },
+{
+    match policy {
+        Ok(()) => match open() {
+            Ok(service) => Ok(Some(service)),
+            Err(error) => Err(error),
+        },
+        Err(None) => Ok(None),
+        Err(Some(error)) => Err(error),
+    }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
+pub(crate) fn observe_policy<E>(
+    path: &Path,
+    error: impl FnOnce(std::io::Error) -> E,
+) -> Result<(), Option<E>> {
+    std::fs::symlink_metadata(path)
+        .map(drop)
+        .map_err(|cause| (cause.kind() != std::io::ErrorKind::NotFound).then(|| error(cause)))
+}
+
+#[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     cell::RefCell,
     collections::BTreeMap,
@@ -11,17 +56,21 @@ use std::{
     rc::{Rc, Weak},
 };
 
+#[cfg(not(verus_keep_ghost))]
 pub struct Session {
     io: Rc<RefCell<Connection>>,
 }
+#[cfg(not(verus_keep_ghost))]
 thread_local! {
     static ACTIVE: RefCell<BTreeMap<PathBuf, Weak<RefCell<Connection>>>> = RefCell::new(BTreeMap::new());
 }
+#[cfg(not(verus_keep_ghost))]
 struct Connection {
     child: Child,
     input: Option<ChildStdin>,
     output: BufReader<ChildStdout>,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Drop for Connection {
     fn drop(&mut self) {
         self.input.take();
@@ -29,6 +78,7 @@ impl Drop for Connection {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub fn installed(name: &str) -> OsString {
     if std::env::var_os("PATH")
         .is_some_and(|p| std::env::split_paths(&p).any(|d| d.join(name).is_file()))
@@ -47,16 +97,15 @@ pub fn installed(name: &str) -> OsString {
         .unwrap_or_else(|| name.into())
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Session {
     /// The retention owner records read capabilities for the lifetime of one operation.
     /// Multiple requests on this host must use the same owner process.
     pub fn scope(root: &Path) -> Result<Option<Self>, String> {
         let policy = crate::no_symlink_parents(root, ".chrono-harness/retention.json")?;
-        match std::fs::symlink_metadata(policy) {
-            Ok(_) => Self::open(root).map(Some),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(e.to_string()),
-        }
+        open_if_configured(observe_policy(&policy, |error| error.to_string()), || {
+            Self::open(root)
+        })
     }
     pub fn open(root: &Path) -> Result<Self, String> {
         let root = std::fs::canonicalize(root).map_err(|e| e.to_string())?;
@@ -111,11 +160,13 @@ impl Session {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub struct Inventory {
     pub session: Session,
     root: PathBuf,
     policies: BTreeMap<String, bool>,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Inventory {
     pub fn adopted(root: &Path) -> Result<Option<Self>, String> {
         let Some(session) = Session::scope(root)? else {
@@ -205,12 +256,14 @@ impl Inventory {
         })
     }
 }
+#[cfg(not(verus_keep_ghost))]
 pub struct Publication {
     dir: PathBuf,
     relative: String,
     pub session: Session,
     id: String,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Publication {
     pub fn id(&self) -> &str {
         &self.id
@@ -245,6 +298,7 @@ impl Publication {
         self.session.query(json!({"operation":"execute-retained","path":self.relative,"member":member,"command":command,"expected_sha256":sha256}))
     }
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn publish_final(
     root: &Path,
     producer: &str,
@@ -259,6 +313,7 @@ pub fn publish_final(
 }
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
+#[cfg(not(verus_keep_ghost))]
 pub struct CommandSpec {
     pub program: String,
     #[serde(default)]
@@ -268,6 +323,7 @@ pub struct CommandSpec {
     pub timeout_seconds: u64,
     pub output_limit_bytes: usize,
 }
+#[cfg(not(verus_keep_ghost))]
 impl CommandSpec {
     pub fn validate(&self) -> Result<(), String> {
         if self.program.is_empty()
@@ -304,20 +360,24 @@ impl CommandSpec {
 }
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+#[cfg(not(verus_keep_ghost))]
 pub struct Original {
     pub path: String,
     pub sha256: String,
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn read_original(root: &Path, o: &Original) -> Result<Vec<u8>, String> {
     let text: String =
         Session::open(root)?.query(json!({"operation":"read-original","original":o}))?;
     Ok(text.into_bytes())
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn identity(path: &Path) -> Result<String, String> {
     use std::os::unix::fs::MetadataExt;
     let meta = std::fs::metadata(path).map_err(|e| e.to_string())?;
     Ok(format!("{}:{}:directory", meta.dev(), meta.ino()))
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn unique_path(store: &Path) -> Result<PathBuf, String> {
     use std::sync::atomic::{AtomicU64, Ordering};
     static COUNTER: AtomicU64 = AtomicU64::new(0);

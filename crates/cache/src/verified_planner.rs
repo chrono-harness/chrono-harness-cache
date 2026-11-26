@@ -15,6 +15,13 @@ pub use crate::files::accepts_relative;
 #[cfg(verus_keep_ghost)]
 pub use files::{accepts_relative, host_relative, invalid_relative_byte};
 
+#[cfg(verus_keep_ghost)]
+#[path = "cli.rs"]
+pub mod diagnostics_service;
+#[cfg(verus_keep_ghost)]
+#[path = "retention.rs"]
+pub mod retention_service;
+
 #[path = "verified_cli.rs"]
 pub mod cli;
 

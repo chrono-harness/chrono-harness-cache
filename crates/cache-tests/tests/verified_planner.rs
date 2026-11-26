@@ -3947,3 +3947,33 @@ fn freshness_transition_prioritizes_observed_state_and_retries_once() {
 }
 
 }
+
+#[cfg(verus_keep_ghost)]
+verus! {
+fn service_case(ok: bool) requires ok, { if !ok { panic!(); } }
+
+fn cache_host_services_only_open_when_the_policy_exists() {
+    let absent = policy::retention_service::open_if_configured(Err::<(), _>(None::<u8>),
+        || -> (r: Result<u16,u8>) requires false, { panic!() });
+    service_case(matches!(absent, Ok(None)));
+    let inaccessible = policy::retention_service::open_if_configured(Err(Some(19u8)),
+        || -> (r: Result<u16,u8>) requires false, { panic!() });
+    service_case(matches!(inaccessible, Err(19u8)));
+    let ready = policy::retention_service::open_if_configured(Ok(()),
+        || -> (r: Result<u16,u8>) ensures r == Ok::<u16,u8>(31u16), { Ok(31u16) });
+    service_case(matches!(ready, Ok(Some(31u16))));
+    let failed = policy::retention_service::open_if_configured(Ok(()),
+        || -> (r: Result<u16,u8>) ensures r == Err::<u16,u8>(17u8), { Err(17u8) });
+    service_case(matches!(failed, Err(17u8)));
+}
+
+fn diagnostics_finishes_the_actual_service_with_the_original_business_exit(code: u8) {
+    let ordinary = policy::diagnostics_service::finish_if_open(None::<u16>, code,
+        |_s: u16, _c: u8| -> (r: Result<u8, u16>) requires false, { panic!() });
+    service_case(matches!(ordinary, Ok(c) if c == code));
+    let rejected = policy::diagnostics_service::finish_if_open(Some(471u16), code,
+        |s: u16, c: u8| -> (r: Result<u8,u16>) requires s == 471u16 && c == code,
+            ensures r == Err::<u8,u16>(s), { Err(s) });
+    service_case(matches!(rejected, Err(471u16)));
+}
+}
