@@ -30,6 +30,22 @@ mod probe;
 verus! {
 
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn refresh_uses_the_last_timestamp_and_propagates_the_actual_write_error() {
+    let ok = |_stage: bool| -> (r: Result<(), u8>) ensures r == Ok::<(), u8>(()), { Ok(()) };
+    let reverted = |final_read: bool| -> (r: Result<bool, u8>) ensures r == Ok::<bool, u8>(!final_read), { Ok(!final_read) };
+    let result = policy::refresh_timestamp(false, ok, reverted);
+    expect_cache_true(matches!(result, Ok(policy::FreshnessDecision::Failed)));
+    let coarse = |retry: bool| -> (r: Result<(), u8>) ensures r == (if retry { Err::<(), u8>(9u8) } else { Ok::<(), u8>(()) }), { if retry { Err(9) } else { Ok(()) } };
+    let stale = |_stage: bool| -> (r: Result<bool, u8>) ensures r == Ok::<bool, u8>(false), { Ok(false) };
+    let retry_failure = policy::refresh_timestamp(false, coarse, stale);
+    expect_cache_true(matches!(retry_failure, Err(9u8)));
+    let unneeded = |_stage: bool| -> (r: Result<(), u8>) ensures r == Err::<(), u8>(3u8), { Err(3) };
+    let unchanged = policy::refresh_timestamp(true, unneeded, stale);
+    expect_cache_true(matches!(unchanged, Ok(policy::FreshnessDecision::AlreadyNewer)));
+}
+
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn cli_preserves_program_argument_coordinates_and_original_bytes() {
     broadcast use vstd::array::group_array_axioms;
     let raw = [0xffu8, 0xa0];

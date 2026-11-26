@@ -469,6 +469,35 @@ pub fn freshness_decision(
     }
 }
 
+/// The filesystem supplies writes and observations. The final read decides the
+/// outcome even if the first read already reported a newer timestamp.
+pub fn refresh_timestamp<E, W: Fn(bool) -> Result<(), E>, R: Fn(bool) -> Result<bool, E>>(
+    current_newer: bool, write: W, read: R,
+) -> (result: Result<FreshnessDecision, E>)
+    requires forall|retry: bool| write.requires((retry,)), forall|final_read: bool| read.requires((final_read,)),
+    ensures match result {
+        Ok(FreshnessDecision::AlreadyNewer) => current_newer,
+        Ok(FreshnessDecision::Retry) => false,
+        Ok(decision) => !current_newer && write.ensures((false,), Ok(()))
+            && (read.ensures((false,), Ok(true)) || (read.ensures((false,), Ok(false)) && write.ensures((true,), Ok(()))))
+            && read.ensures((true,), Ok(decision == FreshnessDecision::Updated)),
+        Err(e) => !current_newer && (write.ensures((false,), Err(e))
+            || (write.ensures((false,), Ok(())) && (read.ensures((false,), Err(e))
+                || (read.ensures((false,), Ok(false)) && write.ensures((true,), Err(e)))
+                || ((read.ensures((false,), Ok(true)) || (read.ensures((false,), Ok(false)) && write.ensures((true,), Ok(()))))
+                    && read.ensures((true,), Err(e)))))),
+    },
+{
+    if current_newer { return Ok(FreshnessDecision::AlreadyNewer); }
+    write(false)?;
+    let first_newer = read(false)?;
+    if let FreshnessDecision::Retry = freshness_decision(false, first_newer, false, false) {
+        write(true)?;
+    }
+    let final_newer = read(true)?;
+    Ok(freshness_decision(false, false, final_newer, true))
+}
+
 pub enum RecoveryAction { Keep, Discard, Refresh }
 
 pub open spec fn content_verification_applies_spec(method: Option<&str>, reason: &str) -> bool {

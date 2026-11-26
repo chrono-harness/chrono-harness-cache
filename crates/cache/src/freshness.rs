@@ -1,6 +1,39 @@
 //! Restore-time timestamps for declared inputs; Cargo still owns compilation and incremental reuse.
+#![allow(unexpected_cfgs)]
+use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
+
+verus! {
+#[derive(Clone, Copy)]
+pub enum Source { File, Json, Registered, Skip }
+
+/// Where the retained source identity comes from for this declaration.
+pub fn source(kind: Option<&str>, present: bool) -> (selection: Source)
+    ensures match kind {
+        Some(k) => if k@ == "file"@ && present { selection == Source::File }
+            else if k@ == "json-value"@ { selection == Source::Json }
+            else if k@ == "registered-files"@ { selection == Source::Registered }
+            else { selection == Source::Skip },
+        None => selection == Source::Skip,
+    },
+{
+    match kind {
+        Some(k) if <&str>::exec_eq(k, "file") && present => Source::File,
+        Some(k) if <&str>::exec_eq(k, "json-value") => Source::Json,
+        Some(k) if <&str>::exec_eq(k, "registered-files") => Source::Registered,
+        _ => Source::Skip,
+    }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::file_identity;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     collections::BTreeMap,
     fs,
@@ -8,14 +41,17 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) const METHOD: &str = "mtime-after-compatible-restore/v1";
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Prepared {
     latest: SystemTime,
     nodes: usize,
     sources: BTreeMap<String, Value>,
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn latest(path: &Path, modified: &mut SystemTime, nodes: &mut usize) -> Result<(), String> {
     let metadata = match fs::symlink_metadata(path) {
         Ok(value) => value,
@@ -33,6 +69,7 @@ fn latest(path: &Path, modified: &mut SystemTime, nodes: &mut usize) -> Result<(
     Ok(())
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn prepare(
     root: &Path,
     cache: &super::Cache,
@@ -43,8 +80,11 @@ pub(crate) fn prepare(
     for input in &cache.source_inputs {
         let selected = &inputs[input];
         let declaration = &selected["declaration"];
-        match declaration["kind"].as_str() {
-            Some("file") if selected["observation"]["presence"] == "present" => {
+        match source(
+            declaration["kind"].as_str(),
+            selected["observation"]["presence"] == "present",
+        ) {
+            Source::File => {
                 sources.insert(
                     declaration["path"]
                         .as_str()
@@ -53,7 +93,7 @@ pub(crate) fn prepare(
                     selected["observation"].clone(),
                 );
             }
-            Some("json-value") => {
+            Source::Json => {
                 sources.insert(
                     declaration["path"]
                         .as_str()
@@ -62,7 +102,7 @@ pub(crate) fn prepare(
                     selected["source_file"].clone(),
                 );
             }
-            Some("registered-files") => {
+            Source::Registered => {
                 for (path, original) in selected["observation"]["files"]
                     .as_object()
                     .ok_or("E_CACHE_FRESHNESS: registered inputs missing")?
@@ -70,7 +110,7 @@ pub(crate) fn prepare(
                     sources.insert(path.clone(), original.clone());
                 }
             }
-            _ => {}
+            Source::Skip => {}
         }
     }
     if sources.is_empty() {
@@ -114,6 +154,7 @@ pub(crate) fn prepare(
     Ok(prepared)
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn apply(root: &Path, prepared: Prepared, report: &mut Value) -> Result<(), String> {
     let start = Instant::now();
     let after = prepared
@@ -128,55 +169,32 @@ pub(crate) fn apply(root: &Path, prepared: Prepared, report: &mut Value) -> Resu
             let path = super::path(root, name)?;
             let file =
                 fs::File::open(path).map_err(|e| format!("E_CACHE_FRESHNESS: {name}: {e}"))?;
-            let current_newer = file
-                .metadata()
-                .map_err(|e| e.to_string())?
-                .modified()
-                .map_err(|e| e.to_string())?
-                > prepared.latest;
-            match super::verified_planner::freshness_decision(current_newer, false, false, false) {
-                super::verified_planner::FreshnessDecision::AlreadyNewer => {
-                    return Ok("already-newer");
+            let newer = || -> Result<bool, String> {
+                Ok(file
+                    .metadata()
+                    .map_err(|e| e.to_string())?
+                    .modified()
+                    .map_err(|e| e.to_string())?
+                    > prepared.latest)
+            };
+            let write = |retry| {
+                if retry {
+                    let later = after
+                        .checked_add(Duration::from_secs(1))
+                        .ok_or("E_CACHE_FRESHNESS: timestamp overflow")?;
+                    file.set_modified(later).map_err(|e| e.to_string())
+                } else {
+                    file.set_modified(after)
+                        .map_err(|e| format!("E_CACHE_FRESHNESS: {name}: {e}"))
                 }
-                super::verified_planner::FreshnessDecision::Updated
-                | super::verified_planner::FreshnessDecision::Retry
-                | super::verified_planner::FreshnessDecision::Failed => {}
-            }
-            file.set_modified(after)
-                .map_err(|e| format!("E_CACHE_FRESHNESS: {name}: {e}"))?;
-            // Coarse timestamp filesystems may round a nanosecond adjustment away.
-            let first_newer = file
-                .metadata()
-                .map_err(|e| e.to_string())?
-                .modified()
-                .map_err(|e| e.to_string())?
-                > prepared.latest;
-            match super::verified_planner::freshness_decision(false, first_newer, false, false) {
-                super::verified_planner::FreshnessDecision::Updated => {}
-                super::verified_planner::FreshnessDecision::Retry => {
-                    file.set_modified(
-                        after
-                            .checked_add(Duration::from_secs(1))
-                            .ok_or("E_CACHE_FRESHNESS: timestamp overflow")?,
-                    )
-                    .map_err(|e| e.to_string())?;
-                }
-                super::verified_planner::FreshnessDecision::AlreadyNewer
-                | super::verified_planner::FreshnessDecision::Failed => {}
-            }
-            let second_newer = file
-                .metadata()
-                .map_err(|e| e.to_string())?
-                .modified()
-                .map_err(|e| e.to_string())?
-                > prepared.latest;
-            match super::verified_planner::freshness_decision(false, false, second_newer, true) {
+            };
+            match super::verified_planner::refresh_timestamp(newer()?, write, |_| newer())? {
+                super::verified_planner::FreshnessDecision::AlreadyNewer => Ok("already-newer"),
                 super::verified_planner::FreshnessDecision::Updated => Ok("updated"),
                 super::verified_planner::FreshnessDecision::Failed => Err(format!(
                     "E_CACHE_FRESHNESS: input timestamp did not advance past restored outputs: {name}"
                 )),
-                super::verified_planner::FreshnessDecision::AlreadyNewer
-                | super::verified_planner::FreshnessDecision::Retry => Err(format!(
+                super::verified_planner::FreshnessDecision::Retry => Err(format!(
                     "E_CACHE_FRESHNESS: invalid freshness transition: {name}"
                 )),
             }
