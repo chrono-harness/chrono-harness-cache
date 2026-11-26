@@ -1,6 +1,31 @@
 //! Keep the caller's PID, typed argument bytes and business events in one diagnostics session.
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
+
+verus! {
+pub fn finish_if_open<S, E, F: FnOnce(S, u8) -> Result<u8, E>>(
+    sink: Option<S>, code: u8, finish: F,
+) -> (out: Result<u8, E>)
+    requires sink matches Some(service) ==> finish.requires((service, code)),
+    ensures match sink {
+        None => out == Ok::<u8, E>(code),
+        Some(service) => finish.ensures((service, code), out),
+    },
+{
+    match sink {
+        Some(service) => finish(service, code),
+        None => Ok(code),
+    }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::{retention::installed, verified_planner::cli as decision};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     ffi::OsString,
     io::{self, BufRead, BufReader, Write},
@@ -9,16 +34,19 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+#[cfg(not(verus_keep_ghost))]
 struct Sink {
     child: Child,
     writer: Option<ChildStdin>,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Drop for Sink {
     fn drop(&mut self) {
         self.writer.take();
         let _ = self.child.wait();
     }
 }
+#[cfg(not(verus_keep_ghost))]
 impl Sink {
     fn open(root: &Path, operation: &str) -> io::Result<Self> {
         let mut child = Command::new(installed("chrono-diagnostics"))
@@ -58,6 +86,7 @@ impl Sink {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn drive(args: &[OsString], sink: &mut Option<Sink>) -> io::Result<u8> {
     let mut decoded = Vec::with_capacity(args.len());
     for (index, arg) in args.iter().enumerate() {
@@ -112,6 +141,7 @@ fn drive(args: &[OsString], sink: &mut Option<Sink>) -> io::Result<u8> {
     published?;
     decision::finish_business(result, |error| writer.event(json!({"diagnostic":error})))
 }
+#[cfg(not(verus_keep_ghost))]
 fn host(args: &[OsString]) -> io::Result<PathBuf> {
     args.get(1..)
         .unwrap_or_default()
@@ -120,26 +150,23 @@ fn host(args: &[OsString]) -> io::Result<PathBuf> {
         .map(|pair| Ok(PathBuf::from(&pair[1])))
         .unwrap_or_else(std::env::current_dir)
 }
+#[cfg(not(verus_keep_ghost))]
 fn operation(args: &[OsString]) -> &str {
     args.get(1).and_then(|arg| arg.to_str()).unwrap_or("")
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn main() -> u8 {
     let args: Vec<_> = std::env::args_os().collect();
     let run = || -> io::Result<u8> {
         let root = host(&args)?;
-        let adopted = match std::fs::symlink_metadata(root.join(".chrono-harness/logging.json")) {
-            Ok(_) => true,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => false,
-            Err(error) => return Err(error),
-        };
-        let mut sink = adopted
-            .then(|| Sink::open(&root, operation(&args)))
-            .transpose()?;
+        let policy =
+            crate::retention::observe_policy(&root.join(".chrono-harness/logging.json"), |error| {
+                error
+            });
+        let mut sink =
+            crate::retention::open_if_configured(policy, || Sink::open(&root, operation(&args)))?;
         let code = drive(&args, &mut sink)?;
-        match sink {
-            Some(sink) => sink.finish(code),
-            None => Ok(code),
-        }
+        finish_if_open(sink, code, Sink::finish)
     };
     run().unwrap_or_else(|e| {
         eprintln!("chrono-cache diagnostics: {e}");
