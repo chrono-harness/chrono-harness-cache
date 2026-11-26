@@ -537,7 +537,16 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache-tests/tests/release_observation.rs",
+            "operation": "verify.cache-release"
+          }
+        ]
+      }
     },
     {
       "path": "crates/cache-tests/Cargo.lock",
@@ -647,7 +656,16 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache-tests/tests/verified_planner.rs",
+            "operation": "verify.cache-planner-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/cache-tests/tests/release_observation.rs",
@@ -680,7 +698,16 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache-tests/tests/verified_planner.rs",
+            "operation": "verify.cache-planner-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/cache-tests/tests/support/mock_inventory.rs",
@@ -692,7 +719,16 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache-tests/tests/verified_planner.rs",
+            "operation": "verify.cache-planner-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/cache-tests/tests/support/mock_owner.rs",
@@ -851,7 +887,20 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache/src/verified_planner.rs",
+            "operation": "verify.cache-planner"
+          },
+          {
+            "path": "crates/cache-tests/tests/verified_planner.rs",
+            "operation": "verify.cache-planner-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/cache/src/freshness.rs",

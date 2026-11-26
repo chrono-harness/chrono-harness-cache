@@ -7,6 +7,14 @@ use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
 use vstd::string::StringSliceAdditionalSpecFns;
 
+#[cfg(verus_keep_ghost)]
+#[path = "files.rs"]
+mod files;
+#[cfg(not(verus_keep_ghost))]
+pub use crate::files::accepts_relative;
+#[cfg(verus_keep_ghost)]
+pub use files::{accepts_relative, host_relative, invalid_relative_byte};
+
 #[path = "verified_cli.rs"]
 pub mod cli;
 
@@ -80,49 +88,6 @@ pub fn json_pointer(raw: &[u8]) -> (valid: bool)
             return false;
         }
         pos += 1;
-    }
-    true
-}
-
-/// Rust paths on the supported Unix hosts admit internal empty and dot components.
-pub open spec fn invalid_relative_byte(raw: Seq<u8>, i: int) -> bool
-    recommends 0 <= i < raw.len(),
-{
-    raw[i] == 0 || raw[i] == 10 || raw[i] == 13 || raw[i] == 92
-    || (raw[i] == 46 && (i == 0 || raw[i - 1] == 47)
-        && i + 1 < raw.len() && raw[i + 1] == 46
-        && (i + 2 == raw.len() || raw[i + 2] == 47))
-}
-
-pub open spec fn host_relative(raw: Seq<u8>) -> bool {
-    raw.len() > 0 && raw[0] != 47
-    && !(raw[0] == 46 && (raw.len() == 1 || raw[1] == 47))
-    && forall|i:int| 0 <= i < raw.len() ==> !invalid_relative_byte(raw, i)
-}
-
-pub fn accepts_relative(raw: &[u8]) -> (accepted: bool)
-    ensures accepted == host_relative(raw@),
-{
-    if raw.len() == 0 || raw[0] == 47
-        || (raw[0] == 46 && (raw.len() == 1 || raw[1] == 47))
-    { return false; }
-
-    let mut i = 0;
-    while i < raw.len()
-        invariant i <= raw.len(),
-            forall|j:int| 0 <= j < i ==> !invalid_relative_byte(raw@, j),
-        decreases raw.len() - i,
-    {
-        let byte = raw[i];
-        if byte == 0 || byte == 10 || byte == 13 || byte == 92
-            || (byte == 46 && (i == 0 || raw[i-1] == 47)
-                && raw.len() - i >= 2 && raw[i+1] == 46
-                && (raw.len() - i == 2 || raw[i+2] == 47))
-        {
-            assert(invalid_relative_byte(raw@, i as int));
-            return false;
-        }
-        i += 1;
     }
     true
 }
