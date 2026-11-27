@@ -78,6 +78,28 @@ pub use probe_source::{ProbeError, admit_probe};
 pub mod text;
 use text::exec_same_text;
 
+#[cfg(verus_keep_ghost)]
+#[path = "document.rs"]
+mod document;
+#[cfg(verus_keep_ghost)]
+#[path = "content.rs"]
+mod native_content;
+#[cfg(verus_keep_ghost)]
+#[path = "lib.rs"]
+mod plan_source;
+#[cfg(not(verus_keep_ghost))]
+pub use crate::{
+    content::compare_rebuilt_plan,
+    document::{decode_document, duplicate_diagnostic},
+    select_plan_input,
+};
+#[cfg(verus_keep_ghost)]
+pub use {
+    document::{decode_document, duplicate_diagnostic},
+    native_content::compare_rebuilt_plan,
+    plan_source::select_plan_input,
+};
+
 verus! {
 
 pub open spec fn valid_pointer_escape(raw: Seq<u8>, pos: int) -> bool

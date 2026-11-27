@@ -1,18 +1,75 @@
 //! Explicit cache key preparation. A plan is not a cache hit or a build verdict.
+#![allow(unexpected_cfgs)]
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
+
+verus! {
+/// A plan with saved inputs never starts a new observation to replace a missing or changed one.
+pub fn select_plan_input<P, V, C, A, O>(
+    prior: Option<Option<P>>, matches: C, adopt: A, observe: O,
+) -> (out: Result<V, String>)
+    where C: FnOnce(&P) -> Result<bool, String>, A: FnOnce(P) -> V,
+        O: FnOnce() -> Result<V, String>,
+    requires prior.is_none() ==> observe.requires(()),
+        forall|p: P| matches.requires((&p,)) && adopt.requires((p,)),
+    ensures match prior {
+        None => observe.ensures((), out),
+        Some(None) => match out { Err(e) => e@ == "E_CACHE_RECOVERY: missing original input"@, _ => false },
+        Some(Some(value)) => exists|check: Result<bool, String>|
+            #[trigger] matches.ensures((&value,), check) && match check {
+                Err(e) => out == Err::<V, String>(e),
+                Ok(false) => match out { Err(e) => e@ == "E_CACHE_RECOVERY: original input declaration differs"@, _ => false },
+                Ok(true) => match out { Ok(v) => adopt.ensures((value,), v), _ => false },
+            },
+    },
+{
+    match prior {
+        None => observe(),
+        Some(None) => Err("E_CACHE_RECOVERY: missing original input".to_string()),
+        Some(Some(value)) => {
+            let check = matches(&value);
+            assert(matches.ensures((&value,), check));
+            match check {
+                Err(error) => Err(error),
+                Ok(false) => Err("E_CACHE_RECOVERY: original input declaration differs".to_string()),
+                Ok(true) => Ok(adopt(value)),
+            }
+        }
+    }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 mod attempt;
+#[cfg(not(verus_keep_ghost))]
 pub mod cli;
+#[cfg(not(verus_keep_ghost))]
 mod content;
+#[cfg(not(verus_keep_ghost))]
 mod document;
+#[cfg(not(verus_keep_ghost))]
 mod files;
+#[cfg(not(verus_keep_ghost))]
 mod freshness;
+#[cfg(not(verus_keep_ghost))]
 mod probe;
+#[cfg(not(verus_keep_ghost))]
 mod recovery;
+#[cfg(not(verus_keep_ghost))]
 mod retention;
+#[cfg(not(verus_keep_ghost))]
 pub mod verified_planner;
+#[cfg(not(verus_keep_ghost))]
 use document::decode;
+#[cfg(not(verus_keep_ghost))]
 use files::{digest, file_identity, no_symlink_parents, sha256};
+#[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -20,6 +77,7 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn current_executable_identity() -> Result<Value, String> {
     let executable =
         fs::canonicalize(std::env::current_exe().map_err(|e| format!("E_CACHE_EXECUTABLE: {e}"))?)
@@ -33,6 +91,7 @@ pub(crate) fn current_executable_identity() -> Result<Value, String> {
     }))
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn retain_original(
     root: &Path,
     directory: &str,
@@ -61,6 +120,7 @@ pub(crate) fn retain_original(
     })
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
@@ -80,6 +140,7 @@ pub struct Config {
     pub recover_unconfirmed_restores: bool,
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct OperationSource {
@@ -87,6 +148,7 @@ pub struct OperationSource {
     pub pointer: String,
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Input {
@@ -117,6 +179,7 @@ pub enum Input {
     },
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum Presence {
@@ -124,6 +187,7 @@ pub enum Presence {
     Absent,
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Artifact {
@@ -131,6 +195,7 @@ pub struct Artifact {
     pub path: String,
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Cache {
@@ -149,6 +214,7 @@ pub struct Cache {
     pub refresh_sources: bool,
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum Restore {
@@ -156,6 +222,7 @@ pub enum Restore {
     Compatible,
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn name(value: &str) -> Result<(), String> {
     if value.is_empty()
         || value.len() > 128
@@ -168,6 +235,7 @@ fn name(value: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn unique(values: &[String]) -> Result<(), String> {
     let mut seen = BTreeSet::new();
     for value in values {
@@ -179,6 +247,7 @@ fn unique(values: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn path(root: &Path, value: &str) -> Result<PathBuf, String> {
     if value.is_empty() || value.contains(['\0', '\n', '\r', '\\', '*', '?', '[', ']']) {
         return Err("E_CACHE_PATH: expected a literal path".into());
@@ -204,6 +273,7 @@ fn path(root: &Path, value: &str) -> Result<PathBuf, String> {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub fn validate(c: &Config) -> Result<(), String> {
     if !verified_planner::current_registration(&c.schema) || c.caches.is_empty() {
         return Err("E_CACHE_CONFIG: expected nonempty chrono-cache/v2 registration".into());
@@ -359,6 +429,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn consumer_operations(root: &Path, c: &Config, consumer: &str) -> Result<Value, String> {
     let mut operations = BTreeSet::new();
     let mut sources = Vec::new();
@@ -419,6 +490,7 @@ fn consumer_operations(root: &Path, c: &Config, consumer: &str) -> Result<Value,
     Ok(json!({"status":"declared","operations":operations,"sources":sources}))
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn observe(
     root: &Path,
     input: &Input,
@@ -509,6 +581,7 @@ fn observe(
     Ok(json!({"declaration":input,"observation":observation}))
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn registered_files(
     root: &Path,
     registry: &str,
@@ -588,10 +661,12 @@ fn registered_files(
 
 /// Read only the selected consumer's explicitly named inputs. Literal values are
 /// declarations; hashing them does not turn them into toolchain observations.
+#[cfg(not(verus_keep_ghost))]
 pub fn prepare(root: &Path, c: &Config, consumer: &str) -> Result<Value, String> {
     attempt::prepare(root, c, consumer, None)
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn prepare_with_inputs(
     root: &Path,
     c: &Config,
@@ -601,6 +676,7 @@ fn prepare_with_inputs(
     prepare_inputs(root, c, consumer, prior, None)
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn prepare_inputs(
     root: &Path,
     c: &Config,
@@ -688,19 +764,16 @@ fn prepare_inputs(
             .chain(&cache.source_inputs)
         {
             if !observations.contains_key(input_id) {
-                let observed = if let Some(prior) = prior {
-                    let value = prior
-                        .get(input_id)
-                        .ok_or("E_CACHE_RECOVERY: missing original input")?;
-                    if value["declaration"]
-                        != serde_json::to_value(&c.inputs[input_id]).map_err(|e| e.to_string())?
-                    {
-                        return Err("E_CACHE_RECOVERY: original input declaration differs".into());
-                    }
-                    value.clone()
-                } else {
-                    observe(&root, &c.inputs[input_id], attempt, input_id)?
-                };
+                let observed = select_plan_input(
+                    prior.map(|inputs| inputs.get(input_id)),
+                    |value| {
+                        let declared = serde_json::to_value(&c.inputs[input_id])
+                            .map_err(|error| error.to_string())?;
+                        Ok(value["declaration"] == declared)
+                    },
+                    |value| value.clone(),
+                    || observe(&root, &c.inputs[input_id], attempt, input_id),
+                )?;
                 observations.insert(input_id.clone(), observed);
             }
         }
@@ -804,6 +877,7 @@ fn prepare_inputs(
     Ok(plan)
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub fn dispatch(args: &[String]) -> Result<String, String> {
     if args.first().map(String::as_str) == Some("seal") {
         return content::dispatch(&args[1..]);

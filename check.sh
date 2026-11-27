@@ -91,8 +91,8 @@ prove verify.cache-planner "$src/verified_planner.rs"
 prove verify.cache-planner-tests "$tests/verified_planner.rs"
 
 admit_proof verify.cache-planner "$src/verified_planner.rs" "$src/files.rs" "$src/cli.rs" "$src/retention.rs" "$src/verified_cli.rs" "$src/verified_content.rs" \
-  "$src/attempt.rs" "$src/recovery.rs" "$src/probe.rs" "$src/verified_text.rs"
+  "$src/attempt.rs" "$src/recovery.rs" "$src/probe.rs" "$src/verified_text.rs" "$src/document.rs" "$src/content.rs" "$src/lib.rs"
 admit_proof verify.cache-planner-tests "$tests/verified_planner.rs" "$included/verified_planner.rs" \
   "$included/files.rs" "$included/cli.rs" "$included/retention.rs" "$included/verified_cli.rs" "$included/verified_content.rs" "$included/attempt.rs" \
-  "$included/recovery.rs" "$included/probe.rs" "$included/verified_text.rs" "$tests/continuity.rs" \
+  "$included/recovery.rs" "$included/probe.rs" "$included/verified_text.rs" "$included/document.rs" "$included/content.rs" "$included/lib.rs" "$tests/continuity.rs" \
   "$tests/keys.rs" "$tests/support/probe.rs" "$tests/recovery.rs" "$tests/support/cache_host.rs" "$tests/support/mock_inventory.rs"

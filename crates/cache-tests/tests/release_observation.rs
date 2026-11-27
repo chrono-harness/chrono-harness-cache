@@ -228,6 +228,9 @@ mod native {
             "$src/recovery.rs",
             "$src/probe.rs",
             "$src/verified_text.rs",
+            "$src/document.rs",
+            "$src/content.rs",
+            "$src/lib.rs",
         ];
         let tests = [
             "verify.cache-planner-tests",
@@ -242,6 +245,9 @@ mod native {
             "$included/recovery.rs",
             "$included/probe.rs",
             "$included/verified_text.rs",
+            "$included/document.rs",
+            "$included/content.rs",
+            "$included/lib.rs",
             "$tests/continuity.rs",
             "$tests/keys.rs",
             "$tests/support/probe.rs",

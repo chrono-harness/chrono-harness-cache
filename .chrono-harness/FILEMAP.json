@@ -914,7 +914,20 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache/src/verified_planner.rs",
+            "operation": "verify.cache-planner"
+          },
+          {
+            "path": "crates/cache-tests/tests/verified_planner.rs",
+            "operation": "verify.cache-planner-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/cache/src/document.rs",
@@ -926,7 +939,20 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache/src/verified_planner.rs",
+            "operation": "verify.cache-planner"
+          },
+          {
+            "path": "crates/cache-tests/tests/verified_planner.rs",
+            "operation": "verify.cache-planner-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/cache/src/files.rs",
@@ -984,7 +1010,20 @@
           "kind": "test-execution",
           "to": "test:cache-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache/src/verified_planner.rs",
+            "operation": "verify.cache-planner"
+          },
+          {
+            "path": "crates/cache-tests/tests/verified_planner.rs",
+            "operation": "verify.cache-planner-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/cache/src/main.rs",
