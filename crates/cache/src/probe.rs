@@ -1,9 +1,57 @@
+#![allow(unexpected_cfgs)]
+#[cfg(verus_keep_ghost)]
+use super::confirmed_probe;
+#[cfg(not(verus_keep_ghost))]
+use crate::verified_planner::confirmed_probe;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
+
+verus! {
+pub enum ProbeError<E> {
+    Launch(E),
+    Unknown,
+    Failed,
+}
+
+/// Record terminality separately from whether this result may supply a cache key.
+pub fn admit_probe<E, T>(
+    launch: Result<(), E>, exit_code: i32, signal: Option<i32>, joined: bool,
+    failed: bool, selected: T,
+) -> (out: (bool, Result<T, ProbeError<E>>))
+    ensures
+        out.0 == (launch.is_ok() && (exit_code >= 0 || signal.is_some()) && joined),
+        out.1 == match launch {
+            Err(error) => Err(ProbeError::Launch(error)),
+            Ok(()) => if !out.0 { Err(ProbeError::Unknown) }
+                else if exit_code != 0 || failed { Err(ProbeError::Failed) }
+                else { Ok(selected) },
+        },
+{
+    let terminal = confirmed_probe(launch.is_ok(), exit_code, signal, joined);
+    let result = match launch {
+        Err(error) => Err(ProbeError::Launch(error)),
+        Ok(()) => if !terminal { Err(ProbeError::Unknown) }
+            else if exit_code != 0 || failed { Err(ProbeError::Failed) }
+            else { Ok(selected) },
+    };
+    (terminal, result)
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::retention::CommandSpec;
+#[cfg(not(verus_keep_ghost))]
 use crate::{file_identity, sha256};
+#[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{collections::BTreeMap, fs, path::Path};
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ResultKind {
@@ -11,6 +59,7 @@ pub enum ResultKind {
     FilePath,
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub fn observe(
     root: &Path,
     command: &CommandSpec,
@@ -106,25 +155,25 @@ pub fn observe(
         .publication
         .session
         .launch(Path::new(&original), &original_digest);
-    let terminal = super::verified_planner::confirmed_probe(
-        launch.is_ok(),
+    let (terminal, admitted) = admit_probe(
+        launch,
         process.exit_code,
         process.exit_signal,
         process.owned_work_joined,
+        process.failure.is_some(),
+        result,
     );
     attempt.unknown.set(!terminal);
-    launch.map_err(|e| format!("E_CACHE_PROBE: {e}; original {original}"))?;
-    if !terminal {
-        return Err(format!(
-            "E_CACHE_PROBE: original process terminality unknown; original {original}"
-        ));
-    }
-    if process.exit_code != 0 || process.failure.is_some() {
-        return Err(format!(
+    let result = admitted.map_err(|error| match error {
+        ProbeError::Launch(error) => format!("E_CACHE_PROBE: {error}; original {original}"),
+        ProbeError::Unknown => {
+            format!("E_CACHE_PROBE: original process terminality unknown; original {original}")
+        }
+        ProbeError::Failed => format!(
             "E_CACHE_PROBE: exit {}, failure {:?}; original {original}",
             process.exit_code, process.failure
-        ));
-    }
+        ),
+    })?;
     let environment: BTreeMap<_, _> = process
         .environment
         .iter()

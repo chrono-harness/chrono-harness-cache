@@ -38,6 +38,25 @@ mod cache_host;
 verus! {
 
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn only_confirmed_success_forwards_the_selected_probe_input() {
+    use policy::{admit_probe, ProbeError};
+    let (terminal, result) = admit_probe(Err(17u8), 23, Some(9), true, true, 41u8);
+    expect_cache_true(!terminal && matches!(result, Err(ProbeError::Launch(17u8))));
+    let (terminal, result) = admit_probe(Ok::<(), u8>(()), 23, None, false, true, 41u8);
+    expect_cache_true(!terminal && matches!(result, Err(ProbeError::Unknown)));
+    let (terminal, result) = admit_probe(Ok::<(), u8>(()), -1, None, true, false, 41u8);
+    expect_cache_true(!terminal && matches!(result, Err(ProbeError::Unknown)));
+    let (terminal, result) = admit_probe(Ok::<(), u8>(()), -1, Some(9), true, false, 41u8);
+    expect_cache_true(terminal && matches!(result, Err(ProbeError::Failed)));
+    let (terminal, result) = admit_probe(Ok::<(), u8>(()), 23, None, true, false, 41u8);
+    expect_cache_true(terminal && matches!(result, Err(ProbeError::Failed)));
+    let (terminal, result) = admit_probe(Ok::<(), u8>(()), 0, None, true, true, 41u8);
+    expect_cache_true(terminal && matches!(result, Err(ProbeError::Failed)));
+    let (terminal, result) = admit_probe(Ok::<(), u8>(()), 0, None, true, false, 41u8);
+    expect_cache_true(terminal && matches!(result, Ok(41u8)));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn refresh_uses_the_last_timestamp_and_propagates_the_actual_write_error() {
     let ok = |_stage: bool| -> (r: Result<(), u8>) ensures r == Ok::<(), u8>(()), { Ok(()) };
     let reverted = |final_read: bool| -> (r: Result<bool, u8>) ensures r == Ok::<bool, u8>(!final_read), { Ok(!final_read) };
