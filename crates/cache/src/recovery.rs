@@ -1897,13 +1897,8 @@ pub(crate) fn dispatch(args: &[String]) -> Result<String, String> {
             plan["consumer"].as_str(),
             |(), consumer| {
                 let prepared =
-                    super::prepare_with_inputs(&root, &config, consumer, Some(&plan["inputs"]))
-                        .map(|mut expected| {
-                            // Recovery keeps the original planner identity; seal checks
-                            // the current executable after the actual producer runs.
-                            expected["planner"] = plan["planner"].clone();
-                            expected != plan
-                        });
+                    super::content::matches_registered_plan(&root, &config, consumer, &plan)
+                        .map(|matched| !matched);
                 ((), prepared)
             },
             |()| ((), super::attempt::validate(&root, &plan, false)),

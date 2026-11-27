@@ -1,12 +1,48 @@
 //! Producer-bound inventories for explicitly opted-in primary-checkout caches.
 //! Inventories describe output bytes; they contain no cached execution verdicts.
+#![allow(unexpected_cfgs)]
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
+
+verus! {
+/// Seal and recovery compare the same rebuilt plan after carrying forward its recorded planner.
+pub fn compare_rebuilt_plan<T, P, E, B, C>(
+    rebuilt: Result<T, E>, original_planner: P, bind: B, compare: C,
+) -> (out: Result<bool, E>)
+    where B: FnOnce(T, P) -> T, C: FnOnce(T) -> bool,
+    requires forall|t: T, p: P| bind.requires((t,p)), forall|t: T| compare.requires((t,)),
+    ensures match rebuilt {
+        Err(error) => out == Err::<bool, E>(error),
+        Ok(t) => exists|bound: T| #[trigger] bind.ensures((t, original_planner), bound)
+            && match out { Ok(b) => compare.ensures((bound,), b), _ => false },
+    },
+{
+    match rebuilt {
+        Err(error) => Err(error),
+        Ok(value) => {
+            let bound = bind(value, original_planner);
+            assert(bind.ensures((value, original_planner), bound));
+            Ok(compare(bound))
+        }
+    }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::{decode, file_identity, no_symlink_parents};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{collections::BTreeMap, fs, path::Path, time::Instant};
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) const MARKER: &str = ".chrono-cache-content-v1.json";
+#[cfg(not(verus_keep_ghost))]
 pub(crate) const METHOD: &str = "producer-manifest/v1";
 
+#[cfg(not(verus_keep_ghost))]
 fn content_manifest(
     cache: &str,
     producer: &Value,
@@ -19,6 +55,7 @@ fn content_manifest(
         "artifact_id":artifact_id,"artifact":artifact,"files":files})
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn inventory(root: &Path) -> Result<Value, String> {
     fn visit(
         root: &Path,
@@ -75,6 +112,25 @@ fn inventory(root: &Path) -> Result<Value, String> {
     Ok(json!(files))
 }
 
+#[cfg(not(verus_keep_ghost))]
+pub(crate) fn matches_registered_plan(
+    root: &Path,
+    config: &super::Config,
+    consumer: &str,
+    plan: &Value,
+) -> Result<bool, String> {
+    compare_rebuilt_plan(
+        super::prepare_with_inputs(root, config, consumer, Some(&plan["inputs"])),
+        &plan["planner"],
+        |mut expected, planner| {
+            expected["planner"] = planner.clone();
+            expected
+        },
+        |expected| expected == *plan,
+    )
+}
+
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn revalidate(
     root: &Path,
     config_path: &str,
@@ -88,9 +144,7 @@ pub(crate) fn revalidate(
     let consumer = plan["consumer"]
         .as_str()
         .ok_or("E_CACHE_CONTENT: consumer missing")?;
-    let mut expected = super::prepare_with_inputs(root, &config, consumer, Some(&plan["inputs"]))?;
-    expected["planner"] = plan["planner"].clone();
-    if expected != *plan {
+    if !matches_registered_plan(root, &config, consumer, plan)? {
         return Err("E_CACHE_CONTENT: plan differs from current registration or host".into());
     }
     super::attempt::validate(root, plan, false)?;
@@ -98,6 +152,7 @@ pub(crate) fn revalidate(
 }
 
 /// Keep the producer manifest and observed inventory before recovery removes outputs.
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn verify(
     root: &Path,
     directory: &str,
@@ -170,6 +225,7 @@ pub(crate) fn verify(
     )
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn dispatch(args: &[String]) -> Result<String, String> {
     let mut options = BTreeMap::new();
     for pair in args.chunks(2) {

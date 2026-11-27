@@ -1,6 +1,6 @@
 [package]
 name = "chrono-cache"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 publish = false
 description = "Explicit cache input and artifact planning"

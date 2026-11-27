@@ -38,6 +38,46 @@ mod cache_host;
 verus! {
 
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn new_observations_and_saved_inputs_have_distinct_sources() {
+    let check = |value: &u8| -> (r: Result<bool,String>) ensures r == Ok::<bool,String>(*value == 17), { Ok(*value == 17) };
+    let adopt = |value: u8| -> (v: u8) ensures v == value, { value };
+    let observe = || -> (r: Result<u8,String>) ensures r == Ok::<u8,String>(41), { Ok(41) };
+    let unused = || -> (r: Result<u8,String>) requires false, { panic!() };
+    expect_cache_true(matches!(policy::select_plan_input(None,check,adopt,observe),Ok(41u8)));
+    expect_cache_true(matches!(policy::select_plan_input(Some(Some(17u8)),check,adopt,unused),Ok(17u8)));
+    let missing = policy::select_plan_input(Some(None::<u8>),check,adopt,unused);
+    expect_cache_true(matches!(missing,Err(e) if policy::same_attempt(&e,Some("E_CACHE_RECOVERY: missing original input"))));
+    let changed = policy::select_plan_input(Some(Some(9u8)),check,adopt,unused);
+    expect_cache_true(matches!(changed,Err(e) if policy::same_attempt(&e,Some("E_CACHE_RECOVERY: original input declaration differs"))));
+    let failed = |_v: &u8| -> (r: Result<bool,String>) ensures match r {Err(e)=>e@=="encode"@,_=>false}, { Err("encode".to_string()) };
+    expect_cache_true(matches!(policy::select_plan_input(Some(Some(9u8)),failed,adopt,unused),Err(e) if policy::same_attempt(&e,Some("encode"))));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn document_decode_preserves_each_error_and_only_reformats_decodable_duplicate_keys() {
+    let convert = |v:u8| -> (r: Result<u8,u8>) ensures r == (if v==2 { Err::<u8,u8>(12) } else { Ok::<u8,u8>(v) }), { if v==2 {Err(12)} else {Ok(v)} };
+    let decode = |v:u8| -> (r: Result<u8,u8>) ensures r == (if v==3 { Err::<u8,u8>(13) } else { Ok::<u8,u8>(v) }), { if v==3 {Err(13)} else {Ok(v)} };
+    expect_cache_true(matches!(policy::decode_document(Err(11u8),convert,decode),Err(11u8)));
+    expect_cache_true(matches!(policy::decode_document(Ok(2u8),convert,decode),Err(12u8)));
+    expect_cache_true(matches!(policy::decode_document(Ok(3u8),convert,decode),Err(13u8)));
+    expect_cache_true(matches!(policy::decode_document(Ok(7u8),convert,decode),Ok(7u8)));
+    let key = |v:u8| -> (r: Option<u8>) ensures r == (if v==5 {Some(9u8)}else{None}), {if v==5 {Some(9)}else{None}};
+    let format = |v:u8,l:u8| -> (r:(u8,u8)) ensures r==(v,l), {(v,l)};
+    expect_cache_true(policy::duplicate_diagnostic(None,key,format).is_none());
+    expect_cache_true(policy::duplicate_diagnostic(Some((6u8,2u8)),key,format).is_none());
+    expect_cache_true(matches!(policy::duplicate_diagnostic(Some((5u8,2u8)),key,format),Some((9u8,2u8))));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn compare_rebuilt_plan_uses_recorded_planner_and_current_plan_fields() {
+    let bind=|plan:(u8,u8), original:u8| -> (r:(u8,u8)) ensures r==(plan.0,original), {(plan.0,original)};
+    let compare=|plan:(u8,u8)| -> (r:bool) ensures r==(plan==(7u8,9u8)), {plan.0==7 && plan.1==9};
+    expect_cache_true(matches!(policy::compare_rebuilt_plan(Ok::<_,u8>((7u8,2u8)),9u8,bind,compare),Ok(true)));
+    expect_cache_true(matches!(policy::compare_rebuilt_plan(Ok::<_,u8>((6u8,2u8)),9u8,bind,compare),Ok(false)));
+    expect_cache_true(matches!(policy::compare_rebuilt_plan(Err(13u8),9u8,bind,compare),Err(13u8)));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn only_confirmed_success_forwards_the_selected_probe_input() {
     use policy::{admit_probe, ProbeError};
     let (terminal, result) = admit_probe(Err(17u8), 23, Some(9), true, true, 41u8);
