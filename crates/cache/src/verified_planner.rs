@@ -68,6 +68,14 @@ pub use attempt::{
 #[cfg(verus_keep_ghost)]
 pub use recovery_source::*;
 
+#[cfg(verus_keep_ghost)]
+#[path = "probe.rs"]
+mod probe_source;
+#[cfg(not(verus_keep_ghost))]
+pub use crate::probe::{ProbeError, admit_probe};
+#[cfg(verus_keep_ghost)]
+pub use probe_source::{ProbeError, admit_probe};
+
 verus! {
 
 pub open spec fn valid_pointer_escape(raw: Seq<u8>, pos: int) -> bool
