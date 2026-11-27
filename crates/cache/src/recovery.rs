@@ -5,11 +5,15 @@
 use super as planner;
 #[cfg(not(verus_keep_ghost))]
 use crate::verified_planner as planner;
-use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
+
+#[cfg(verus_keep_ghost)]
+use super::text::exec_same_text;
+#[cfg(not(verus_keep_ghost))]
+use crate::verified_planner::text::exec_same_text;
 
 verus! {
 
@@ -1153,10 +1157,10 @@ fn recovery_option(text: &str) -> (out: Option<RecoveryOption>)
         None => recovery_arg_slot(text@) == 4,
     },
 {
-    if <&str>::exec_eq(text, "--host-root") { Some(RecoveryOption::HostRoot) }
-    else if <&str>::exec_eq(text, "--config") { Some(RecoveryOption::Config) }
-    else if <&str>::exec_eq(text, "--plan") { Some(RecoveryOption::Plan) }
-    else if <&str>::exec_eq(text, "--steps-env") { Some(RecoveryOption::StepsEnvironment) }
+    if exec_same_text(text, "--host-root") { Some(RecoveryOption::HostRoot) }
+    else if exec_same_text(text, "--config") { Some(RecoveryOption::Config) }
+    else if exec_same_text(text, "--plan") { Some(RecoveryOption::Plan) }
+    else if exec_same_text(text, "--steps-env") { Some(RecoveryOption::StepsEnvironment) }
     else { None }
 }
 

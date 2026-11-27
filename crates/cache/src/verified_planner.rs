@@ -28,8 +28,6 @@ pub mod cli;
 #[path = "verified_content.rs"]
 pub mod content_preflight;
 
-use vstd::contrib::exec_spec::ExecSpecEq;
-
 #[cfg(verus_keep_ghost)]
 #[path = "attempt.rs"]
 mod attempt;
@@ -75,6 +73,10 @@ mod probe_source;
 pub use crate::probe::{ProbeError, admit_probe};
 #[cfg(verus_keep_ghost)]
 pub use probe_source::{ProbeError, admit_probe};
+
+#[path = "verified_text.rs"]
+pub mod text;
+use text::exec_same_text;
 
 verus! {
 
@@ -368,20 +370,20 @@ pub fn restore_status(
         Some(outcome) => outcome,
         None => return "unavailable",
     };
-    if <&str>::exec_eq(outcome, "success") {
+    if exec_same_text(outcome, "success") {
         let key = match matched {
             Some(key) => key,
             None => return "miss-or-unavailable",
         };
         if key.as_bytes().len() == 0 { return "miss-or-unavailable"; }
         if let Some(requested) = requested {
-            if <&str>::exec_eq(requested, key) { return "exact"; }
+            if exec_same_text(requested, key) { return "exact"; }
         }
         if compatible_restore(key, prefixes) { "compatible" } else { "incompatible" }
-    } else if <&str>::exec_eq(outcome, "failure")
-        || <&str>::exec_eq(outcome, "cancelled") {
+    } else if exec_same_text(outcome, "failure")
+        || exec_same_text(outcome, "cancelled") {
         "error"
-    } else if <&str>::exec_eq(outcome, "skipped") {
+    } else if exec_same_text(outcome, "skipped") {
         "not-attempted"
     } else {
         "unavailable"
@@ -395,8 +397,8 @@ pub fn producer_can_seal(save_on_failure: bool, outcome: Option<&str>) -> (allow
     },
 {
     match outcome {
-        Some(value) => <&str>::exec_eq(value, "success")
-            || (save_on_failure && <&str>::exec_eq(value, "failure")),
+        Some(value) => exec_same_text(value, "success")
+            || (save_on_failure && exec_same_text(value, "failure")),
         None => false,
     }
 }
@@ -404,7 +406,7 @@ pub fn producer_can_seal(save_on_failure: bool, outcome: Option<&str>) -> (allow
 pub fn refresh_sources(enabled: bool, reason: &str) -> (refresh: bool)
     ensures refresh <==> (enabled && reason@ == "compatible"@),
 {
-    enabled && <&str>::exec_eq(reason, "compatible")
+    enabled && exec_same_text(reason, "compatible")
 }
 
 /// The filesystem adapter reports observations; this function owns the
@@ -576,29 +578,29 @@ pub fn recovery_action(
         matched_key_is_null_or_string, content_method, content_status, refresh_enabled),
 {
     let discard = match outcome {
-        Some(value) if <&str>::exec_eq(value, "failure") => true,
-        Some(value) if <&str>::exec_eq(value, "success") => {
+        Some(value) if exec_same_text(value, "failure") => true,
+        Some(value) if exec_same_text(value, "success") => {
             if unconfirmed {
                 if !outputs_is_null_or_object || !matched_key_is_null_or_string {
                     return Err(RecoveryDecisionError::MalformedOutputs);
                 }
-                <&str>::exec_eq(reason, "miss-or-unavailable")
-                    || <&str>::exec_eq(reason, "incompatible")
+                exec_same_text(reason, "miss-or-unavailable")
+                    || exec_same_text(reason, "incompatible")
             } else {
                 false
             }
         }
-        Some(value) if <&str>::exec_eq(value, "skipped") => false,
+        Some(value) if exec_same_text(value, "skipped") => false,
         Some(_) | None => return Err(RecoveryDecisionError::UnknownOutcome),
     };
     if discard {
         return Ok(RecoveryAction::Discard);
     }
     let verify_content = content_verification_applies(content_method, reason);
-    if verify_content && !matches!(content_status, Some(status) if <&str>::exec_eq(status, "matched")) {
+    if verify_content && !matches!(content_status, Some(status) if exec_same_text(status, "matched")) {
         return Ok(RecoveryAction::Discard);
     }
-    if refresh_enabled && <&str>::exec_eq(reason, "compatible") {
+    if refresh_enabled && exec_same_text(reason, "compatible") {
         Ok(RecoveryAction::Refresh)
     } else {
         Ok(RecoveryAction::Keep)
@@ -609,9 +611,9 @@ pub fn content_verification_applies(method: Option<&str>, reason: &str) -> (appl
     ensures applies == content_verification_applies_spec(method, reason),
 {
     match method {
-        Some(method) => <&str>::exec_eq(method, "producer-manifest/v1")
-            && (<&str>::exec_eq(reason, "exact")
-                || <&str>::exec_eq(reason, "compatible")),
+        Some(method) => exec_same_text(method, "producer-manifest/v1")
+            && (exec_same_text(reason, "exact")
+                || exec_same_text(reason, "compatible")),
         None => false,
     }
 }
@@ -619,7 +621,7 @@ pub fn content_verification_applies(method: Option<&str>, reason: &str) -> (appl
 pub fn current_registration(schema: &str) -> (valid: bool)
     ensures valid <==> schema@ == "chrono-cache/v2"@,
 {
-    <&str>::exec_eq(schema, "chrono-cache/v2")
+    exec_same_text(schema, "chrono-cache/v2")
 }
 
 pub open spec fn current_plan_schema(schema: Option<&str>) -> bool {
@@ -633,7 +635,7 @@ pub fn current_plan(schema: Option<&str>) -> (valid: bool)
     ensures valid <==> current_plan_schema(schema),
 {
     match schema {
-        Some(schema) => <&str>::exec_eq(schema, "chrono-cache-plan/v2"),
+        Some(schema) => exec_same_text(schema, "chrono-cache-plan/v2"),
         None => false,
     }
 }
@@ -657,7 +659,7 @@ pub fn matches_planner_identity(
 {
     match (declared_sha256, declared_version, observed_sha256, observed_version) {
         (Some(ds), Some(dv), Some(os), Some(ov)) =>
-            <&str>::exec_eq(ds, os) && <&str>::exec_eq(dv, ov),
+            exec_same_text(ds, os) && exec_same_text(dv, ov),
         _ => false,
     }
 }

@@ -313,6 +313,11 @@
       "path": "crates/cache/src/verified_planner.rs",
       "presence": "present"
     },
+    "source.crates.cache.src.verified_text.rs": {
+      "kind": "file",
+      "path": "crates/cache/src/verified_text.rs",
+      "presence": "present"
+    },
     "cargo-home-config": {
       "kind": "file",
       "path": "target/cargo-home/config",
@@ -420,7 +425,8 @@
         "source.crates.cache.src.recovery.rs",
         "source.crates.cache.src.retention.rs",
         "source.crates.cache.src.verified_content.rs",
-        "source.crates.cache.src.verified_planner.rs"
+        "source.crates.cache.src.verified_planner.rs",
+        "source.crates.cache.src.verified_text.rs"
       ],
       "restore": "compatible",
       "verify_contents": true,

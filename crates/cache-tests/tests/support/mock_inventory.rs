@@ -2,6 +2,11 @@
 #![allow(unexpected_cfgs)]
 use vstd::prelude::*;
 
+#[cfg(verus_keep_ghost)]
+use crate::policy::text::exec_same_text;
+#[cfg(not(verus_keep_ghost))]
+use chrono_cache::verified_planner::text::exec_same_text;
+
 verus! {
 /// The mock custodian admits a member only when length and full digest agree.
 pub fn member_identity<F: FnOnce() -> String>(actual_len: u64, expected_len: u64,
@@ -12,7 +17,7 @@ pub fn member_identity<F: FnOnce() -> String>(actual_len: u64, expected_len: u64
 {
     if actual_len != expected_len { return false; }
     let digest = hash();
-    let ok = <&str as vstd::contrib::exec_spec::ExecSpecEq>::exec_eq(digest.as_str(), expected);
+    let ok = exec_same_text(digest.as_str(), expected);
     proof { assert(hash.ensures((), digest)); }
     ok
 }

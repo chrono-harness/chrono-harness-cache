@@ -42,7 +42,11 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".chrono-harness/ci/cargo.json",
@@ -1140,6 +1144,39 @@
           {
             "path": "crates/cache-tests/tests/verified_planner.rs",
             "operation": "verify.cache-planner-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/cache/src/verified_text.rs",
+      "owner": "cache",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:cache-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/cache/src/verified_planner.rs",
+            "operation": "verify.cache-planner"
+          },
+          {
+            "path": "crates/cache-tests/tests/verified_planner.rs",
+            "operation": "verify.cache-planner-tests"
+          },
+          {
+            "path": "crates/cache/src/freshness.rs",
+            "operation": "verify.cache-freshness"
+          },
+          {
+            "path": "crates/cache-tests/tests/release_observation.rs",
+            "operation": "verify.cache-release"
           }
         ]
       }

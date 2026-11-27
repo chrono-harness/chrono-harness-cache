@@ -7,6 +7,14 @@ use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
 use vstd::vpanic as panic;
 
+#[cfg(verus_keep_ghost)]
+#[path = "../../cache/src/verified_text.rs"]
+mod text;
+#[cfg(not(verus_keep_ghost))]
+use chrono_cache::verified_planner::text::exec_same_text;
+#[cfg(verus_keep_ghost)]
+use text::exec_same_text;
+
 verus! {
 fn plan_matches(wanted: &String, version: &String, consumer: &String, operations: &[String], key: &String) -> (valid: bool)
     ensures valid == (version@ == wanted@ && consumer@ == "build"@ && operations@.len() == 1
@@ -97,7 +105,7 @@ fn source_arguments(actual: &[&str], expected: &[&str]) -> (matches: bool)
             forall|j: int| 0 <= j < i ==> actual@[j]@ == expected@[j]@,
         decreases expected.len() - i,
     {
-        if !<&str as vstd::contrib::exec_spec::ExecSpecEq>::exec_eq(actual[i], expected[i]) { return false; }
+        if !exec_same_text(actual[i], expected[i]) { return false; }
         i += 1;
     }
     true
@@ -219,6 +227,7 @@ mod native {
             "$src/attempt.rs",
             "$src/recovery.rs",
             "$src/probe.rs",
+            "$src/verified_text.rs",
         ];
         let tests = [
             "verify.cache-planner-tests",
@@ -232,6 +241,7 @@ mod native {
             "$included/attempt.rs",
             "$included/recovery.rs",
             "$included/probe.rs",
+            "$included/verified_text.rs",
             "$tests/continuity.rs",
             "$tests/keys.rs",
             "$tests/support/probe.rs",
