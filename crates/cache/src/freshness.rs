@@ -1,10 +1,17 @@
 //! Restore-time timestamps for declared inputs; Cargo still owns compilation and incremental reuse.
 #![allow(unexpected_cfgs)]
-use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
+
+#[cfg(verus_keep_ghost)]
+#[path = "verified_text.rs"]
+mod text;
+#[cfg(not(verus_keep_ghost))]
+use crate::verified_planner::text::exec_same_text;
+#[cfg(verus_keep_ghost)]
+use text::exec_same_text;
 
 verus! {
 #[derive(Clone, Copy)]
@@ -21,9 +28,9 @@ pub fn source(kind: Option<&str>, present: bool) -> (selection: Source)
     },
 {
     match kind {
-        Some(k) if <&str>::exec_eq(k, "file") && present => Source::File,
-        Some(k) if <&str>::exec_eq(k, "json-value") => Source::Json,
-        Some(k) if <&str>::exec_eq(k, "registered-files") => Source::Registered,
+        Some(k) if exec_same_text(k, "file") && present => Source::File,
+        Some(k) if exec_same_text(k, "json-value") => Source::Json,
+        Some(k) if exec_same_text(k, "registered-files") => Source::Registered,
         _ => Source::Skip,
     }
 }

@@ -1,10 +1,14 @@
 //! Cache planning owns its original probe attempts; retention owns custody and disposal.
 #![allow(unexpected_cfgs)]
-use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
+
+#[cfg(verus_keep_ghost)]
+use super::text::exec_same_text;
+#[cfg(not(verus_keep_ghost))]
+use crate::verified_planner::text::exec_same_text;
 
 verus! {
 pub open spec fn cache_record_publication_result<S, B, P, Q, F, E, W, L, R, D, O, Y>(
@@ -340,7 +344,7 @@ pub fn cache_publication_error_fragments<'a>(relative: &'a str,
 pub fn same_attempt(expected: &str, original: Option<&str>) -> (bound: bool)
     ensures bound == match original { Some(value) => expected@ == value@, None => false },
 {
-    match original { Some(value) => <&str>::exec_eq(expected, value), None => false }
+    match original { Some(value) => exec_same_text(expected, value), None => false }
 }
 
 pub fn accept_original(bound: bool, terminal: bool, sealed: bool) -> (accepted: bool)
