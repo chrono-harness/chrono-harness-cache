@@ -7,6 +7,27 @@ use vstd::prelude::verus;
 use vstd::prelude::*;
 
 verus! {
+pub enum ContentEntry { File, Symlink, Directory, Unsupported }
+
+pub fn content_entry(file: bool, symlink: bool, directory: bool) -> (entry: ContentEntry)
+    ensures entry == if file { ContentEntry::File }
+        else if symlink { ContentEntry::Symlink }
+        else if directory { ContentEntry::Directory }
+        else { ContentEntry::Unsupported },
+{
+    if file { ContentEntry::File }
+    else if symlink { ContentEntry::Symlink }
+    else if directory { ContentEntry::Directory }
+    else { ContentEntry::Unsupported }
+}
+
+/// Only the root's producer marker is excluded from its own inventory.
+pub fn include_content_child(at_root: bool, is_marker: bool) -> (include: bool)
+    ensures include == !(at_root && is_marker),
+{
+    !(at_root && is_marker)
+}
+
 /// Seal and recovery compare the same rebuilt plan after carrying forward its recorded planner.
 pub fn compare_rebuilt_plan<T, P, E, B, C>(
     rebuilt: Result<T, E>, original_planner: P, bind: B, compare: C,
@@ -68,32 +89,39 @@ fn inventory(root: &Path) -> Result<Value, String> {
             .to_str()
             .ok_or("non-UTF8 cache content path")?
             .to_owned();
-        let value = if metadata.is_file() {
-            let (sha256, bytes) = file_identity(&path)?;
-            #[cfg(unix)]
-            let executable = {
-                use std::os::unix::fs::PermissionsExt;
-                metadata.permissions().mode() & 0o111
-            };
-            #[cfg(not(unix))]
-            let executable = 0;
-            json!({"kind":"file","sha256":sha256,"bytes":bytes,"executable":executable})
-        } else if metadata.is_symlink() {
-            let target = fs::read_link(&path).map_err(|e| e.to_string())?;
-            json!({"kind":"symlink","target":target.to_str().ok_or("non-UTF8 cache symlink")?})
-        } else if metadata.is_dir() {
-            json!({"kind":"directory"})
-        } else {
-            return Err(format!(
-                "unsupported cache content type: {}",
-                path.display()
-            ));
+        let entry = content_entry(metadata.is_file(), metadata.is_symlink(), metadata.is_dir());
+        let value = match entry {
+            ContentEntry::File => {
+                let (sha256, bytes) = file_identity(&path)?;
+                #[cfg(unix)]
+                let executable = {
+                    use std::os::unix::fs::PermissionsExt;
+                    metadata.permissions().mode() & 0o111
+                };
+                #[cfg(not(unix))]
+                let executable = 0;
+                json!({"kind":"file","sha256":sha256,"bytes":bytes,"executable":executable})
+            }
+            ContentEntry::Symlink => {
+                let target = fs::read_link(&path).map_err(|e| e.to_string())?;
+                json!({"kind":"symlink","target":target.to_str().ok_or("non-UTF8 cache symlink")?})
+            }
+            ContentEntry::Directory => json!({"kind":"directory"}),
+            ContentEntry::Unsupported => {
+                return Err(format!(
+                    "unsupported cache content type: {}",
+                    path.display()
+                ));
+            }
         };
         files.insert(key, value);
-        if metadata.is_dir() {
+        if matches!(entry, ContentEntry::Directory) {
             for child in fs::read_dir(path).map_err(|e| e.to_string())? {
                 let child = child.map_err(|e| e.to_string())?;
-                if relative.as_os_str().is_empty() && child.file_name() == MARKER {
+                if !include_content_child(
+                    relative.as_os_str().is_empty(),
+                    child.file_name() == MARKER,
+                ) {
                     continue;
                 }
                 visit(root, &relative.join(child.file_name()), files)?;

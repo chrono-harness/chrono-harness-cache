@@ -6,6 +6,46 @@ use vstd::prelude::verus;
 use vstd::prelude::*;
 
 verus! {
+/// Only an existing name permits a readback. A failed write or read keeps its original error.
+pub fn retain_original_bytes<F, E, W, R, T>(
+    opened: Result<F, (u32, E)>, already_exists: u32, write: W, identical: R, render: T,
+) -> (out: Result<(), String>)
+    where W: FnOnce(F) -> Result<(), String>, R: FnOnce() -> Result<bool, String>,
+        T: FnOnce(E) -> String,
+    requires
+        forall|f: F| write.requires((f,)),
+        identical.requires(()),
+        forall|e: E| render.requires((e,)),
+    ensures match opened {
+        Ok(file) => write.ensures((file,), out),
+        Err((kind, error)) => if kind == already_exists {
+            exists|same: Result<bool, String>| #[trigger] identical.ensures((), same)
+                && match same {
+                    Ok(true) => out == Ok::<(), String>(()),
+                    Ok(false) => match out {
+                        Err(e) => e@ == "E_CACHE_ORIGINAL: retained original differs"@,
+                        _ => false,
+                    },
+                    Err(e) => out == Err::<(), String>(e),
+                }
+        } else { match out { Err(e) => render.ensures((error,), e), _ => false } },
+    },
+{
+    match opened {
+        Ok(file) => write(file),
+        Err((kind, _)) if kind == already_exists => {
+            let same = identical();
+            assert(identical.ensures((), same));
+            match same {
+                Ok(true) => Ok(()),
+                Ok(false) => Err("E_CACHE_ORIGINAL: retained original differs".to_string()),
+                Err(error) => Err(error),
+            }
+        }
+        Err((_, error)) => Err(render(error)),
+    }
+}
+
 /// A plan with saved inputs never starts a new observation to replace a missing or changed one.
 pub fn select_plan_input<P, V, C, A, O>(
     prior: Option<Option<P>>, matches: C, adopt: A, observe: O,
@@ -101,19 +141,22 @@ pub(crate) fn retain_original(
     let digest = sha256(raw);
     let path = format!("{directory}{stem}-{digest}.json");
     let target = files::prepare_publication(root, &path)?;
-    match fs::OpenOptions::new()
+    let opened = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(&target)
-    {
-        Ok(mut file) => file.write_all(raw).map_err(|e| e.to_string())?,
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            if fs::read(target).map_err(|e| e.to_string())? != raw {
-                return Err("E_CACHE_ORIGINAL: retained original differs".into());
-            }
-        }
-        Err(e) => return Err(format!("E_CACHE_ORIGINAL: {e}")),
-    }
+        .map_err(|error| (error.kind() as u32, error));
+    retain_original_bytes(
+        opened,
+        std::io::ErrorKind::AlreadyExists as u32,
+        |mut file| file.write_all(raw).map_err(|error| error.to_string()),
+        || {
+            fs::read(target)
+                .map(|bytes| bytes == raw)
+                .map_err(|error| error.to_string())
+        },
+        |error| format!("E_CACHE_ORIGINAL: {error}"),
+    )?;
     Ok(retention::Original {
         path,
         sha256: digest,

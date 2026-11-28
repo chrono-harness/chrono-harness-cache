@@ -38,6 +38,50 @@ mod cache_host;
 verus! {
 
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn inventory_uses_the_observed_entry_and_excludes_only_its_own_marker() {
+    expect_cache_true(matches!(policy::content_entry(true, false, false), policy::ContentEntry::File));
+    expect_cache_true(matches!(policy::content_entry(false, true, false), policy::ContentEntry::Symlink));
+    expect_cache_true(matches!(policy::content_entry(false, false, true), policy::ContentEntry::Directory));
+    expect_cache_true(matches!(policy::content_entry(false, false, false), policy::ContentEntry::Unsupported));
+    expect_cache_true(!policy::include_content_child(true, true));
+    expect_cache_true(policy::include_content_child(false, true));
+    expect_cache_true(policy::include_content_child(true, false));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn retaining_an_original_preserves_the_actual_write_read_and_open_errors() {
+    let write_failure = |_file: u8| -> (out: Result<(), String>)
+        ensures match out { Err(e) => e@ == "write error"@, _ => false },
+        { Err("write error".to_string()) };
+    let unused_read = || -> (out: Result<bool, String>) ensures out == Ok::<bool, String>(true),
+        { Ok(true) };
+    let render = |_error: u8| -> (out: String)
+        ensures out@ == "E_CACHE_ORIGINAL: open error"@,
+        { "E_CACHE_ORIGINAL: open error".to_string() };
+    let write = policy::retain_original_bytes(Ok(7u8), 1, write_failure, unused_read, render);
+    expect_cache_true(matches!(write, Err(e) if policy::same_attempt(&e, Some("write error"))));
+
+    let no_file = |_file: u8| -> (out: Result<(), String>) ensures out == Ok::<(), String>(()), { Ok(()) };
+    let opened = Err((1u32, 3u8));
+    let matched = policy::retain_original_bytes(opened, 1, no_file, unused_read, render);
+    expect_cache_true(matches!(matched, Ok(())));
+    let differs = || -> (out: Result<bool, String>) ensures out == Ok::<bool, String>(false),
+        { Ok(false) };
+    let mismatched = policy::retain_original_bytes(opened, 1, no_file, differs, render);
+    expect_cache_true(matches!(mismatched, Err(e) if policy::same_attempt(&e,
+        Some("E_CACHE_ORIGINAL: retained original differs"))));
+
+    let read_failure = || -> (out: Result<bool, String>)
+        ensures match out { Err(e) => e@ == "read error"@, _ => false },
+        { Err("read error".to_string()) };
+    let unreadable = policy::retain_original_bytes(opened, 1, no_file, read_failure, render);
+    expect_cache_true(matches!(unreadable, Err(e) if policy::same_attempt(&e, Some("read error"))));
+    let denied = policy::retain_original_bytes(Err((2, 3u8)), 1, no_file, unused_read, render);
+    expect_cache_true(matches!(denied, Err(e) if policy::same_attempt(&e,
+        Some("E_CACHE_ORIGINAL: open error"))));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn new_observations_and_saved_inputs_have_distinct_sources() {
     let check = |value: &u8| -> (r: Result<bool,String>) ensures r == Ok::<bool,String>(*value == 17), { Ok(*value == 17) };
     let adopt = |value: u8| -> (v: u8) ensures v == value, { value };

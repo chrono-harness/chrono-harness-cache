@@ -28,6 +28,14 @@ fn rejected_unknown(code: i32, error_size: u64) -> (valid: bool)
     ensures valid == (code == 2 && error_size > 0),
 { code == 2 && error_size > 0 }
 
+fn release_matches(checkout: &str, workflow_sha: &str, packaged: &str, plan: &str, replay: &str) -> (valid: bool)
+    ensures valid == (checkout@ == workflow_sha@ && packaged@ == plan@ && packaged@ == replay@),
+{
+    exec_same_text(checkout, workflow_sha)
+        && exec_same_text(packaged, plan)
+        && exec_same_text(packaged, replay)
+}
+
 fn receipt_matches(code: i64, joined: bool, pid: u64, launch_pid: u64, digest: &String, launch_digest: &String, expected: &String, observed: &String) -> (valid: bool)
     ensures valid == (code == 0 && joined && pid > 0 && pid == launch_pid
         && digest@ == launch_digest@ && expected@ == observed@),
@@ -89,6 +97,10 @@ fn release_observer_rejects_different_inputs_and_processes() {
     expect_release(!receipt_matches(0, true, 7, 7, &key, &key, &key, &wrong));
     expect_release(planned_event(&"chrono-cache".to_string(), &"cache.plan.prepared".to_string()));
     expect_release(!planned_event(&wrong, &"cache.plan.prepared".to_string()));
+    expect_release(release_matches("key", "key", "other", "other", "other"));
+    expect_release(!release_matches("key", "other", "key", "key", "key"));
+    expect_release(!release_matches("key", "key", "key", "other", "key"));
+    expect_release(!release_matches("key", "key", "key", "key", "other"));
 }
 
 fn deployed_check() -> &'static str { include_str!("../../../check.sh") }
@@ -136,7 +148,14 @@ mod native {
         Ok(serde_json::from_slice(&fs::read(path)?)?)
     }
 
-    pub(super) fn check(version: &String, host: &Path, code: i32) -> Result<()> {
+    pub(super) fn check(
+        version: &String,
+        host: &Path,
+        code: i32,
+        packaged: &Path,
+        checkout: &str,
+        workflow_sha: &str,
+    ) -> Result<()> {
         let plan = document(&host.join("plan.json"))?;
         let operations: Vec<String> =
             serde_json::from_value(plan["consumer_operations"]["operations"].clone())?;
@@ -206,6 +225,17 @@ mod native {
         if !found {
             return Err("missing prepared event".into());
         }
+        let digest = hex::encode(Sha256::digest(fs::read(packaged)?));
+        if !release_matches(
+            checkout,
+            workflow_sha,
+            &digest,
+            &text(&plan["planner"]["sha256"])?,
+            &text(&parsed["planner"]["sha256"])?,
+        ) {
+            return Err("release checkout or packaged planner identity differs".into());
+        }
+        println!("release_observation source={checkout} planner_sha256={digest} version={version}");
         Ok(())
     }
 
@@ -299,16 +329,27 @@ mod native {
     }
 
     #[test]
-    fn release_runs_observer_before_packaging() {
-        assert!(deployed_workflow().contains("--example release_observation -- \"${product_version%%-*}\" \"$host\" \"$code\"\n          mkdir \"$RUNNER_TEMP/dist\""));
+    fn release_observes_the_packaged_binary_and_checkout_before_upload() {
+        let workflow = deployed_workflow();
+        let copied = workflow.find("cp \"$binary\" \"$packaged\"").unwrap();
+        let observed = workflow.find("--example release_observation -- \"${product_version%%-*}\" \"$host\" \"$code\" \"$packaged\" \"$(git rev-parse HEAD)\" \"$GITHUB_SHA\"").unwrap();
+        let uploaded = workflow.find("uses: actions/upload-artifact@").unwrap();
+        assert!(copied < observed && observed < uploaded);
     }
 }
 
 #[cfg(not(verus_keep_ghost))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let [_, version, host, code]: [String; 4] = std::env::args()
+    let [_, version, host, code, packaged, checkout, workflow_sha]: [String; 7] = std::env::args()
         .collect::<Vec<_>>()
         .try_into()
-        .map_err(|_| "expected version, host and unknown-consumer exit")?;
-    native::check(&version, std::path::Path::new(&host), code.parse()?)
+        .map_err(|_| "expected version, host, unknown-consumer exit, packaged binary, checkout and workflow SHA")?;
+    native::check(
+        &version,
+        std::path::Path::new(&host),
+        code.parse()?,
+        std::path::Path::new(&packaged),
+        &checkout,
+        &workflow_sha,
+    )
 }
