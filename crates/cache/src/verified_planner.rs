@@ -89,15 +89,15 @@ mod native_content;
 mod plan_source;
 #[cfg(not(verus_keep_ghost))]
 pub use crate::{
-    content::compare_rebuilt_plan,
+    content::{ContentEntry, compare_rebuilt_plan, content_entry, include_content_child},
     document::{decode_document, duplicate_diagnostic},
-    select_plan_input,
+    retain_original_bytes, select_plan_input,
 };
 #[cfg(verus_keep_ghost)]
 pub use {
     document::{decode_document, duplicate_diagnostic},
-    native_content::compare_rebuilt_plan,
-    plan_source::select_plan_input,
+    native_content::{ContentEntry, compare_rebuilt_plan, content_entry, include_content_child},
+    plan_source::{retain_original_bytes, select_plan_input},
 };
 
 verus! {
